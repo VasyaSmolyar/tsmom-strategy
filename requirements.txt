@@ -13,8 +13,10 @@ scipy>=1.9.0
 statsmodels>=0.13.0
 
 # Backtesting and financial analysis
-empyrical>=0.5.5
-pyfolio>=0.9.2
+# Replaced empyrical with pandas-ta for technical analysis
+pandas-ta>=0.3.14b0
+# Replaced pyfolio with pyfolio-reloaded (maintained fork)
+pyfolio-reloaded>=0.9.2
 
 # Jupyter notebooks
 jupyter>=1.0.0
