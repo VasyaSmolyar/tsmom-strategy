@@ -74,9 +74,11 @@ class DataLoader:
         for symbol in symbols:
             try:
                 ticker = yf.Ticker(symbol)
-                ticker_data = ticker.history(start=start_date, end=end_date)
+                ticker_data = ticker.history(start=start_date, end=end_date, interval='1d')
                 
                 if not ticker_data.empty:
+                    # Convert index to date only (remove time component)
+                    ticker_data.index = ticker_data.index.date
                     data[symbol] = ticker_data['Close']
                     logger.info(f"Downloaded data for {symbol}: {len(ticker_data)} observations")
                 else:
@@ -89,6 +91,10 @@ class DataLoader:
         if data:
             combined_data = pd.DataFrame(data)
             combined_data.index.name = 'Date'
+            
+            # Convert index to datetime if it's not already
+            if not isinstance(combined_data.index, pd.DatetimeIndex):
+                combined_data.index = pd.to_datetime(combined_data.index)
             
             # Save raw data
             raw_file = self.raw_dir / "raw_prices.csv"
@@ -110,21 +116,31 @@ class DataLoader:
             Cleaned price data DataFrame
         """
         logger.info("Cleaning data...")
+        logger.info(f"Initial data shape: {data.shape}")
+        logger.info(f"Initial assets: {list(data.columns)}")
         
         # Remove columns with too many missing values
-        missing_threshold = 0.1  # 10% missing data threshold
+        missing_threshold = 0.5  # 50% missing data threshold (increased from 10%)
         missing_pct = data.isnull().sum() / len(data)
         valid_columns = missing_pct[missing_pct < missing_threshold].index
         data = data[valid_columns]
         
-        # Forward fill missing values (up to 5 consecutive days)
-        data = data.fillna(method='ffill', limit=5)
+        logger.info(f"After missing data filter: {data.shape}")
+        logger.info(f"Assets after missing data filter: {list(data.columns)}")
+        
+        # Forward fill missing values (up to 10 consecutive days)
+        data = data.ffill(limit=10)
+        
+        # Backward fill remaining missing values at the beginning
+        data = data.bfill(limit=5)
         
         # Remove rows with any remaining missing values
         data = data.dropna()
         
+        logger.info(f"After forward/backward fill: {data.shape}")
+        
         # Remove assets with insufficient data
-        min_obs = 252 * 2  # At least 2 years of data
+        min_obs = 252 * 1  # At least 1 year of data (reduced from 2 years)
         valid_assets = data.columns[data.count() >= min_obs]
         data = data[valid_assets]
         
@@ -154,7 +170,7 @@ class DataLoader:
             returns = prices.pct_change().dropna()
         elif frequency == 'M':
             # Resample to monthly and calculate returns
-            monthly_prices = prices.resample('M').last()
+            monthly_prices = prices.resample('ME').last()
             returns = monthly_prices.pct_change().dropna()
         else:
             raise ValueError(f"Unsupported frequency: {frequency}")
