@@ -62,12 +62,13 @@ def main():
         
         # Run backtest
         print("Running backtest...")
-        portfolio_returns = strategy.run_backtest(returns)
+        strategy_results = strategy.run_strategy(returns)
+        portfolio_returns = strategy_results['returns']
         
         # Analyze performance
         print("Analyzing performance...")
         analyzer = PerformanceAnalyzer()
-        results = analyzer.analyze_performance(portfolio_returns, returns)
+        results = analyzer.calculate_comprehensive_metrics(portfolio_returns)
         
         # Save results
         output_dir = Path("reports")

@@ -246,6 +246,8 @@ class TSMOMStrategy:
         
         return results
     
+
+    
     def calculate_performance_metrics(self, returns: pd.Series) -> Dict:
         """
         Calculate key performance metrics for the strategy.
