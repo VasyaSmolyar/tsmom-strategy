@@ -10,12 +10,13 @@ from typing import List, Dict, Optional
 import logging
 from pathlib import Path
 import yaml
+from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
 
-class DataLoader:
-    """Handles data downloading and processing for TSMOM strategy."""
+class DataLoader(ABC):
+    """Abstract base class for data loaders."""
     
     def __init__(self, config_path: str = "config/config.yaml"):
         """Initialize DataLoader with configuration."""
@@ -44,6 +45,7 @@ class DataLoader:
         
         return assets
     
+    @abstractmethod
     def download_data(self, symbols: Optional[List[str]] = None, 
                      start_date: Optional[str] = None,
                      end_date: Optional[str] = None) -> pd.DataFrame:
@@ -58,52 +60,7 @@ class DataLoader:
         Returns:
             DataFrame with OHLCV data for all symbols
         """
-        if symbols is None:
-            symbols = self.get_asset_universe()
-        
-        if start_date is None:
-            start_date = self.config['data']['start_date']
-        
-        if end_date is None:
-            end_date = self.config['data']['end_date']
-        
-        logger.info(f"Downloading data for {len(symbols)} symbols from {start_date} to {end_date}")
-        
-        # Download data using yfinance
-        data = {}
-        for symbol in symbols:
-            try:
-                ticker = yf.Ticker(symbol)
-                ticker_data = ticker.history(start=start_date, end=end_date, interval='1d')
-                
-                if not ticker_data.empty:
-                    # Convert index to date only (remove time component)
-                    ticker_data.index = ticker_data.index.date
-                    data[symbol] = ticker_data['Close']
-                    logger.info(f"Downloaded data for {symbol}: {len(ticker_data)} observations")
-                else:
-                    logger.warning(f"No data found for {symbol}")
-                    
-            except Exception as e:
-                logger.error(f"Error downloading data for {symbol}: {e}")
-        
-        # Combine all data into a single DataFrame
-        if data:
-            combined_data = pd.DataFrame(data)
-            combined_data.index.name = 'Date'
-            
-            # Convert index to datetime if it's not already
-            if not isinstance(combined_data.index, pd.DatetimeIndex):
-                combined_data.index = pd.to_datetime(combined_data.index)
-            
-            # Save raw data
-            raw_file = self.raw_dir / "raw_prices.csv"
-            combined_data.to_csv(raw_file)
-            logger.info(f"Saved raw data to {raw_file}")
-            
-            return combined_data
-        else:
-            raise ValueError("No data was successfully downloaded")
+        pass
     
     def clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -190,11 +147,151 @@ class DataLoader:
             return self.clean_data(raw_data)
 
 
+class YahooLoader(DataLoader):
+    """Yahoo Finance data loader implementation."""
+    
+    def download_data(self, symbols: Optional[List[str]] = None, 
+                     start_date: Optional[str] = None,
+                     end_date: Optional[str] = None) -> pd.DataFrame:
+        """
+        Download historical price data for given symbols using Yahoo Finance.
+        
+        Args:
+            symbols: List of symbols to download. If None, uses config assets.
+            start_date: Start date for data download. If None, uses config.
+            end_date: End date for data download. If None, uses config.
+        
+        Returns:
+            DataFrame with OHLCV data for all symbols
+        """
+        if symbols is None:
+            symbols = self.get_asset_universe()
+        
+        if start_date is None:
+            start_date = self.config['data']['start_date']
+        
+        if end_date is None:
+            end_date = self.config['data']['end_date']
+        
+        logger.info(f"Downloading data from Yahoo Finance for {len(symbols)} symbols from {start_date} to {end_date}")
+        
+        # Download data using yfinance
+        data = {}
+        for symbol in symbols:
+            try:
+                ticker = yf.Ticker(symbol)
+                ticker_data = ticker.history(start=start_date, end=end_date, interval='1d')
+                
+                if not ticker_data.empty:
+                    # Convert index to date only (remove time component)
+                    ticker_data.index = ticker_data.index.date
+                    data[symbol] = ticker_data['Close']
+                    logger.info(f"Downloaded data for {symbol}: {len(ticker_data)} observations")
+                else:
+                    logger.warning(f"No data found for {symbol}")
+                    
+            except Exception as e:
+                logger.error(f"Error downloading data for {symbol}: {e}")
+        
+        # Combine all data into a single DataFrame
+        if data:
+            combined_data = pd.DataFrame(data)
+            combined_data.index.name = 'Date'
+            
+            # Convert index to datetime if it's not already
+            if not isinstance(combined_data.index, pd.DatetimeIndex):
+                combined_data.index = pd.to_datetime(combined_data.index)
+            
+            # Save raw data
+            raw_file = self.raw_dir / "raw_prices_yahoo.csv"
+            combined_data.to_csv(raw_file)
+            logger.info(f"Saved raw data to {raw_file}")
+            
+            return combined_data
+        else:
+            raise ValueError("No data was successfully downloaded")
+
+
+class TInvestLoader(DataLoader):
+    """T-Invest API data loader implementation (placeholder)."""
+    
+    def __init__(self, config_path: str = "config/config.yaml"):
+        """Initialize T-Invest loader with configuration."""
+        super().__init__(config_path)
+        # TODO: Add T-Invest API credentials and initialization
+        self.api_token = None  # Placeholder for API token
+        self.base_url = "https://api.tinvest.ru"  # Placeholder URL
+        
+    def download_data(self, symbols: Optional[List[str]] = None, 
+                     start_date: Optional[str] = None,
+                     end_date: Optional[str] = None) -> pd.DataFrame:
+        """
+        Download historical price data for given symbols using T-Invest API.
+        
+        Args:
+            symbols: List of symbols to download. If None, uses config assets.
+            start_date: Start date for data download. If None, uses config.
+            end_date: End date for data download. If None, uses config.
+        
+        Returns:
+            DataFrame with OHLCV data for all symbols
+        """
+        if symbols is None:
+            symbols = self.get_asset_universe()
+        
+        if start_date is None:
+            start_date = self.config['data']['start_date']
+        
+        if end_date is None:
+            end_date = self.config['data']['end_date']
+        
+        logger.info(f"Downloading data from T-Invest API for {len(symbols)} symbols from {start_date} to {end_date}")
+        
+        # TODO: Implement actual T-Invest API calls
+        # This is a placeholder implementation that returns empty DataFrame
+        logger.warning("T-Invest API integration not yet implemented. Returning empty DataFrame.")
+        
+        # Create empty DataFrame with proper structure
+        empty_data = pd.DataFrame(columns=symbols, index=pd.date_range(start=start_date, end=end_date))
+        empty_data.index.name = 'Date'
+        
+        # Save raw data
+        raw_file = self.raw_dir / "raw_prices_tinvest.csv"
+        empty_data.to_csv(raw_file)
+        logger.info(f"Saved placeholder data to {raw_file}")
+        
+        return empty_data
+
+
+def create_data_loader(config_path: str = "config/config.yaml") -> DataLoader:
+    """
+    Factory function to create appropriate data loader based on configuration.
+    
+    Args:
+        config_path: Path to configuration file
+    
+    Returns:
+        Appropriate DataLoader instance
+    """
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    
+    data_source = config['data'].get('source', 'Yahoo')
+    
+    if data_source == 'Yahoo':
+        return YahooLoader(config_path)
+    elif data_source == 'T-Invest':
+        return TInvestLoader(config_path)
+    else:
+        raise ValueError(f"Unsupported data source: {data_source}")
+
+
 def main():
     """Main function for data loading and processing."""
     logging.basicConfig(level=logging.INFO)
     
-    loader = DataLoader()
+    # Use factory function to create appropriate loader
+    loader = create_data_loader()
     
     # Download and process data
     prices = loader.load_processed_data()

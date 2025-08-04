@@ -9,6 +9,7 @@ strategy:
 
 # Data Parameters
 data:
+  source: "Yahoo"  # Data source: "Yahoo" or "T-Invest"
   start_date: "2000-01-01"
   end_date: "2023-12-31"
   frequency: "D"  # Daily data

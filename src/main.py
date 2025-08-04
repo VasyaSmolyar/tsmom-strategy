@@ -12,7 +12,7 @@ import argparse
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from data.data_loader import DataLoader
+from data.data_loader import create_data_loader
 from strategy.tsmom_strategy import TSMOMStrategy
 from analysis.performance_analyzer import PerformanceAnalyzer
 
@@ -49,7 +49,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     
     # Step 1: Data Loading and Processing
     logger.info("Step 1: Loading and processing data...")
-    loader = DataLoader(config_path)
+    loader = create_data_loader(config_path)
     
     if download_data:
         logger.info("Downloading fresh data...")
@@ -139,7 +139,7 @@ def run_sensitivity_analysis(config_path: str = "config/config.yaml") -> dict:
     logger.info("Running sensitivity analysis...")
     
     # Load data
-    loader = DataLoader(config_path)
+    loader = create_data_loader(config_path)
     prices = loader.load_processed_data()
     returns = loader.calculate_returns(prices, 'D')
     
