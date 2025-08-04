@@ -44,8 +44,15 @@ def main():
             print(f"Max Drawdown: {metrics.get('max_drawdown', 0):.2%}")
             
             if 'benchmark_annual_return' in metrics:
+                print(f"\nBenchmark Comparison (S&P500):")
                 print(f"Benchmark Return: {metrics.get('benchmark_annual_return', 0):.2%}")
                 print(f"Excess Return: {metrics.get('excess_return', 0):.2%}")
+                print(f"Information Ratio: {metrics.get('information_ratio', 0):.2f}")
+                print(f"Beta: {metrics.get('beta', 0):.4f}")
+                print(f"Alpha: {metrics.get('alpha', 0):.2%}")
+                
+                # Print strategy start date info
+                print(f"\nNote: Comparison period starts from strategy application date (2004-11-10)")
         
         print(f"\nReports saved to: reports/")
         print(f"Log file: tsmom_backtest.log")

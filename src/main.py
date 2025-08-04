@@ -78,13 +78,16 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         logger.info("Step 3: Generating performance analysis...")
         analyzer = PerformanceAnalyzer()
         
-        # Get benchmark data
-        benchmark_returns = analyzer.generate_benchmark_data()
+        # Get benchmark data aligned with strategy start
+        benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+            strategy_results['returns']
+        )
         
-        # Generate comprehensive report
+        # Generate comprehensive report with alignment
         analysis_results = analyzer.generate_comprehensive_report(
             strategy_results['returns'],
-            benchmark_returns
+            benchmark_returns,
+            align_with_strategy_start=True
         )
         
         logger.info("Performance analysis completed")

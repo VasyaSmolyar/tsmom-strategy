@@ -345,10 +345,156 @@ class PerformanceAnalyzer:
             logger.error(f"Error downloading benchmark data: {e}")
             return pd.Series()
     
+    def get_strategy_start_date(self, strategy_returns: pd.Series) -> str:
+        """
+        Get the first date when strategy is actually applied (first non-zero return).
+        
+        Args:
+            strategy_returns: Strategy returns series
+        
+        Returns:
+            String with the first strategy date
+        """
+        # Find first non-zero return (strategy actually starts)
+        non_zero_returns = strategy_returns[strategy_returns != 0]
+        if len(non_zero_returns) > 0:
+            first_strategy_date = non_zero_returns.index[0]
+            return first_strategy_date.strftime('%Y-%m-%d')
+        else:
+            # Fallback to first non-null date
+            first_date = strategy_returns.dropna().index[0]
+            return first_date.strftime('%Y-%m-%d')
+    
+    def get_strategy_start_date_dt(self, strategy_returns: pd.Series) -> pd.Timestamp:
+        """
+        Get the first date when strategy is actually applied (first non-zero return).
+        
+        Args:
+            strategy_returns: Strategy returns series
+        
+        Returns:
+            Timestamp with the first strategy date
+        """
+        # Find first non-zero return (strategy actually starts)
+        non_zero_returns = strategy_returns[strategy_returns != 0]
+        if len(non_zero_returns) > 0:
+            return non_zero_returns.index[0]
+        else:
+            # Fallback to first non-null date
+            return strategy_returns.dropna().index[0]
+    
+    def generate_benchmark_data_from_strategy_start(self, strategy_returns: pd.Series,
+                                                   symbol: str = "^GSPC",
+                                                   end_date: str = "2023-12-31") -> pd.Series:
+        """
+        Download benchmark data starting from the first day when strategy is applied.
+        
+        Args:
+            strategy_returns: Strategy returns series
+            symbol: Benchmark symbol (default: S&P 500)
+            end_date: End date for benchmark data
+        
+        Returns:
+            Benchmark returns series aligned with strategy start
+        """
+        # Get the first strategy date
+        start_date = self.get_strategy_start_date(strategy_returns)
+        
+        # Add some buffer to ensure we have data
+        if isinstance(start_date, str):
+            start_date_dt = pd.to_datetime(start_date)
+        else:
+            start_date_dt = start_date
+        
+        # Go back a few days to ensure we have the start date
+        buffer_start = start_date_dt - pd.Timedelta(days=5)
+        buffer_start_str = buffer_start.strftime('%Y-%m-%d')
+        
+        try:
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(start=buffer_start_str, end=end_date)
+            benchmark_returns = data['Close'].pct_change().dropna()
+            
+            # Normalize timezone to UTC and then remove timezone info
+            benchmark_returns.index = benchmark_returns.index.tz_localize(None)
+            
+            logger.info(f"Downloaded benchmark data for {symbol} from {buffer_start_str}")
+            logger.info(f"Strategy start date: {start_date}")
+            logger.info(f"Benchmark data points: {len(benchmark_returns)}")
+            
+            return benchmark_returns
+        except Exception as e:
+            logger.error(f"Error downloading benchmark data: {e}")
+            return pd.Series()
+    
+    def align_strategy_and_benchmark(self, strategy_returns: pd.Series,
+                                   benchmark_returns: pd.Series) -> Tuple[pd.Series, pd.Series]:
+        """
+        Align strategy returns with benchmark returns starting from strategy start date.
+        
+        Args:
+            strategy_returns: Strategy returns series
+            benchmark_returns: Benchmark returns series
+        
+        Returns:
+            Tuple of aligned strategy and benchmark returns
+        """
+        # Get strategy start date
+        strategy_start_date = self.get_strategy_start_date_dt(strategy_returns)
+        logger.info(f"Strategy start date: {strategy_start_date}")
+        
+        # Filter strategy returns from start date
+        strategy_aligned = strategy_returns[strategy_returns.index >= strategy_start_date]
+        logger.info(f"Strategy aligned data range: {strategy_aligned.index.min()} to {strategy_aligned.index.max()}")
+        logger.info(f"Strategy aligned data points: {len(strategy_aligned)}")
+        
+        # Log benchmark data range
+        logger.info(f"Benchmark data range: {benchmark_returns.index.min()} to {benchmark_returns.index.max()}")
+        logger.info(f"Benchmark data points: {len(benchmark_returns)}")
+        
+        # Align benchmark returns with strategy
+        common_dates = strategy_aligned.index.intersection(benchmark_returns.index)
+        
+        if len(common_dates) == 0:
+            logger.warning("No common dates between strategy and benchmark")
+            logger.warning(f"Strategy dates: {strategy_aligned.index[:5].tolist()} ... {strategy_aligned.index[-5:].tolist()}")
+            logger.warning(f"Benchmark dates: {benchmark_returns.index[:5].tolist()} ... {benchmark_returns.index[-5:].tolist()}")
+            return strategy_aligned, pd.Series()
+        
+        strategy_final = strategy_aligned.loc[common_dates]
+        benchmark_final = benchmark_returns.loc[common_dates]
+        
+        logger.info(f"Aligned strategy and benchmark from {strategy_start_date}")
+        logger.info(f"Aligned period: {len(strategy_final)} periods")
+        logger.info(f"Final aligned range: {strategy_final.index.min()} to {strategy_final.index.max()}")
+        
+        return strategy_final, benchmark_final
+    
     def generate_comprehensive_report(self, strategy_returns: pd.Series,
-                                   benchmark_returns: Optional[pd.Series] = None) -> Dict:
-        """Generate comprehensive performance report."""
+                                   benchmark_returns: Optional[pd.Series] = None,
+                                   align_with_strategy_start: bool = True) -> Dict:
+        """
+        Generate comprehensive performance report.
+        
+        Args:
+            strategy_returns: Strategy returns series
+            benchmark_returns: Benchmark returns series (optional)
+            align_with_strategy_start: Whether to align benchmark with strategy start date
+        """
         logger.info("Generating comprehensive performance report...")
+        
+        # If benchmark is provided and we want to align with strategy start
+        if benchmark_returns is not None and align_with_strategy_start:
+            strategy_aligned, benchmark_aligned = self.align_strategy_and_benchmark(
+                strategy_returns, benchmark_returns
+            )
+            
+            if len(strategy_aligned) > 0 and len(benchmark_aligned) > 0:
+                strategy_returns = strategy_aligned
+                benchmark_returns = benchmark_aligned
+                logger.info("Aligned strategy and benchmark with strategy start date")
+            else:
+                logger.warning("Could not align strategy and benchmark, using original data")
         
         # Calculate metrics
         metrics = self.calculate_comprehensive_metrics(strategy_returns, benchmark_returns)
@@ -458,13 +604,16 @@ def main():
     # Analyze performance
     analyzer = PerformanceAnalyzer()
     
-    # Get benchmark data
-    benchmark_returns = analyzer.generate_benchmark_data()
+    # Get benchmark data aligned with strategy start
+    benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+        results['returns']
+    )
     
-    # Generate comprehensive report
+    # Generate comprehensive report with alignment
     report = analyzer.generate_comprehensive_report(
         results['returns'], 
-        benchmark_returns
+        benchmark_returns,
+        align_with_strategy_start=True
     )
     
     print("Performance analysis completed!")
