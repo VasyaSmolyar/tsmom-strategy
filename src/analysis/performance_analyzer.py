@@ -181,6 +181,7 @@ class PerformanceAnalyzer:
         plt.ylabel('Cumulative Return', fontsize=12)
         plt.legend(fontsize=12)
         plt.grid(True, alpha=0.3)
+        plt.yscale('log')  # Set y-axis to logarithmic scale
         plt.tight_layout()
         
         # Save plot
