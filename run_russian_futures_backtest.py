@@ -90,7 +90,7 @@ def main():
             
             f.write(f"## Performance Metrics\n")
             f.write(f"- Total Return: {results['total_return']:.2%}\n")
-            f.write(f"- Annualized Return: {results['annualized_return']:.2%}\n")
+            f.write(f"- Annual Return: {results['annual_return']:.2%}\n")
             f.write(f"- Volatility: {results['volatility']:.2%}\n")
             f.write(f"- Sharpe Ratio: {results['sharpe_ratio']:.2f}\n")
             f.write(f"- Max Drawdown: {results['max_drawdown']:.2%}\n\n")
@@ -110,7 +110,7 @@ def main():
         print(f"Period: {prices.index.min().date()} to {prices.index.max().date()}")
         print(f"Assets: {len(prices.columns)}")
         print(f"Total Return: {results['total_return']:.2%}")
-        print(f"Annualized Return: {results['annualized_return']:.2%}")
+        print(f"Annual Return: {results['annual_return']:.2%}")
         print(f"Volatility: {results['volatility']:.2%}")
         print(f"Sharpe Ratio: {results['sharpe_ratio']:.2f}")
         print(f"Max Drawdown: {results['max_drawdown']:.2%}")
