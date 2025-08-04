@@ -1,4 +1,4 @@
-# TSMOM Strategy Configuration
+# TSMOM Strategy Configuration for Tinkoff API
 
 # Strategy Parameters
 strategy:
@@ -9,44 +9,14 @@ strategy:
 
 # Data Parameters
 data:
-  source: "Yahoo"  # Data source: "Yahoo" or "T-Invest"
-  start_date: "2000-01-01"
+  source: "Tinkoff"  # Data source: "Yahoo" or "Tinkoff"
+  start_date: "2020-01-01"  # Tinkoff data available from ~2010
   end_date: "2023-12-31"
   frequency: "D"  # Daily data
-  min_assets: 20
+  min_assets: 5
 
-# Asset Universe
+# Asset Universe - Russian Futures
 assets:
-  equity_indices:
-    - "^GSPC"  # S&P 500
-    - "^DJI"   # Dow Jones
-    - "^IXIC"  # NASDAQ
-    - "^FTSE"  # FTSE 100
-    - "^N225"  # Nikkei 225
-    - "^GDAXI" # DAX
-    - "^FCHI"  # CAC 40
-  
-  bonds:
-    - "^TNX"   # 10Y Treasury
-    - "^TYX"   # 30Y Treasury
-    - "TLT"    # 20+ Year Treasury Bond ETF
-    - "IEF"    # 7-10 Year Treasury Bond ETF
-  
-  currencies:
-    - "EURUSD=X"  # EUR/USD
-    - "GBPUSD=X"  # GBP/USD
-    - "JPYUSD=X"  # JPY/USD
-    - "CHFUSD=X"  # CHF/USD
-    - "CADUSD=X"  # CAD/USD
-  
-  commodities:
-    - "GC=F"   # Gold Futures
-    - "CL=F"   # Crude Oil Futures
-    - "ZC=F"   # Corn Futures
-    - "ZS=F"   # Soybean Futures
-    - "KC=F"   # Coffee Futures
-    - "CT=F"   # Cotton Futures
-  
   russian_futures:
     - "Si"      # USD/RUB Futures
     - "BR"      # Brent Oil Futures
@@ -61,9 +31,9 @@ assets:
 
 # Backtest Parameters
 backtest:
-  initial_capital: 1000000  # $1M starting capital
+  initial_capital: 1000000  # ₽1M starting capital
   rebalance_frequency: "M"  # Monthly rebalancing
-  benchmark: "^GSPC"        # S&P 500 as benchmark
+  benchmark: "RI"           # RTS Index as benchmark
 
 # Risk Management
 risk:

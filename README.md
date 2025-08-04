@@ -36,6 +36,7 @@ The strategy uses 20+ assets across multiple asset classes:
 - **Bonds**: Treasury yields, bond ETFs
 - **Currencies**: Major FX pairs (EUR/USD, GBP/USD, etc.)
 - **Commodities**: Gold, oil, agricultural futures
+- **Russian Futures**: USD/RUB, Brent Oil, RTS Index, Gold, Blue chips (Sberbank, Gazprom, etc.)
 
 ## 📁 Project Structure
 
@@ -65,9 +66,10 @@ tsmom_backtest/
 
 ### Data Management
 - ✅ Automatic data download from Yahoo Finance
+- ✅ Tinkoff Investments API integration for Russian futures
 - ✅ Data cleaning and validation
 - ✅ Support for multiple asset classes
-- ✅ Historical data from 2000 to present
+- ✅ Historical data from 2000 to present (Yahoo) / 2010+ (Tinkoff)
 
 ### Strategy Implementation
 - ✅ Time Series Momentum signals
@@ -112,6 +114,18 @@ The analysis provides comprehensive metrics:
 python run_backtest.py
 ```
 
+### Russian Futures Backtest
+```bash
+# Set Tinkoff API token
+export TINKOFF_TOKEN='your_token_here'
+
+# Run Russian futures backtest
+python run_russian_futures_backtest.py
+
+# Test Tinkoff data loader
+python test_tinvest_loader.py
+```
+
 ### Advanced Usage
 ```bash
 # Run with custom configuration
@@ -137,6 +151,7 @@ jupyter notebook notebooks/tsmom_analysis.ipynb
 - Python 3.8+
 - pandas, numpy, matplotlib, seaborn
 - yfinance (for data download)
+- tinkoff-investments (for Russian futures data)
 - scipy, statsmodels (for analysis)
 - pytest (for testing)
 
@@ -153,7 +168,9 @@ pytest --cov=src tests/
 ## 📚 Documentation
 
 - [Usage Guide](docs/USAGE.md) - Detailed usage instructions
+- [Tinkoff Setup](TINKOFF_SETUP.md) - Russian futures setup guide
 - [Configuration](config/config.yaml) - Strategy parameters
+- [Russian Futures Config](config/config_tinkoff.yaml) - Russian futures configuration
 - [Jupyter Notebook](notebooks/tsmom_analysis.ipynb) - Interactive analysis
 
 ## 🔬 Research Background

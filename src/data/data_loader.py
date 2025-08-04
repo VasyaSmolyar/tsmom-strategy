@@ -27,7 +27,7 @@ def create_data_loader(config_path: str = "config/config.yaml") -> DataLoader:
     
     if data_source == 'Yahoo':
         return YahooLoader(config_path)
-    elif data_source == 'T-Invest':
+    elif data_source == 'T-Invest' or data_source == 'Tinkoff':
         return TInvestLoader(config_path)
     else:
         raise ValueError(f"Unsupported data source: {data_source}")
