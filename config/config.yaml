@@ -65,6 +65,12 @@ assets:
     - "CT=F"   # Cotton Futures
     - "BR.ME"  # Brent Oil (MOEX)
     - "GOLD.ME" # Gold (MOEX)
+  
+  moex_futures:
+    - "BRF6"   # Brent Oil Futures (MOEX)
+    - "BRG6"   # Brent Oil Futures (MOEX)
+    - "BRH6"   # Brent Oil Futures (MOEX)
+    - "BRJ6"   # Brent Oil Futures (MOEX)
 
 # Backtest Parameters
 backtest:
