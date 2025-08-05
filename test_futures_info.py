@@ -520,6 +520,166 @@ def test_historical_futures_download():
         traceback.print_exc()
         return {}
 
+def test_save_historical_futures_data():
+    """Test saving historical futures data by days."""
+    print("\nTesting saving historical futures data by days...")
+    print("=" * 70)
+    
+    try:
+        loader = MoexLoader()
+        
+        # Define historical periods to test
+        historical_periods = {
+            "2022": {
+                "BR": ["BRH2", "BRJ2", "BRK2"],
+                "GD": ["GDH2"],
+                "NG": ["NGH2", "NGJ2", "NGK2"]
+            },
+            "2023": {
+                "BR": ["BRH3", "BRJ3", "BRK3"],
+                "GD": ["GDH3"],
+                "NG": ["NGH3", "NGJ3", "NGK3"]
+            },
+            "2024": {
+                "BR": ["BRH4", "BRJ4", "BRK4"],
+                "GD": ["GDH4"],
+                "NG": ["NGH4", "NGJ4", "NGK4"]
+            }
+        }
+        
+        # Create data directory if it doesn't exist
+        data_dir = Path("data/historical_futures")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        
+        saved_files = []
+        
+        for year, asset_types in historical_periods.items():
+            print(f"\n📅 {year} год:")
+            print("-" * 40)
+            
+            year_dir = data_dir / str(year)
+            year_dir.mkdir(exist_ok=True)
+            
+            for asset_type, tickers in asset_types.items():
+                print(f"\n🔍 {asset_type} futures:")
+                
+                asset_dir = year_dir / asset_type
+                asset_dir.mkdir(exist_ok=True)
+                
+                for ticker in tickers:
+                    try:
+                        # Define period for this ticker (January of the year)
+                        start_date = f"{year}-01-01"
+                        end_date = f"{year}-01-31"
+                        
+                        print(f"   🔍 Загружаю {ticker} для {start_date} - {end_date}...")
+                        
+                        # Download data
+                        data = loader._get_futures_data(ticker, start_date, end_date)
+                        
+                        if not data.empty:
+                            # Save to CSV
+                            csv_file = asset_dir / f"{ticker}_daily.csv"
+                            data.to_csv(csv_file)
+                            
+                            # Save summary info
+                            summary_file = asset_dir / f"{ticker}_summary.txt"
+                            with open(summary_file, 'w', encoding='utf-8') as f:
+                                f.write(f"Ticker: {ticker}\n")
+                                f.write(f"Asset Type: {asset_type}\n")
+                                f.write(f"Year: {year}\n")
+                                f.write(f"Period: {start_date} to {end_date}\n")
+                                f.write(f"Records: {len(data)}\n")
+                                f.write(f"Date Range: {data.index.min()} to {data.index.max()}\n")
+                                f.write(f"Price Range: ${data['close'].min():.2f} - ${data['close'].max():.2f}\n")
+                                f.write(f"Average Volume: {data['volume'].mean():.0f}\n")
+                                f.write(f"Columns: {list(data.columns)}\n")
+                            
+                            saved_files.append({
+                                'ticker': ticker,
+                                'asset_type': asset_type,
+                                'year': year,
+                                'csv_file': str(csv_file),
+                                'summary_file': str(summary_file),
+                                'records': len(data),
+                                'price_range': f"${data['close'].min():.2f}-${data['close'].max():.2f}"
+                            })
+                            
+                            print(f"      ✅ {ticker}: {len(data)} записей, цена: ${data['close'].min():.2f}-${data['close'].max():.2f}")
+                            print(f"      💾 Сохранено в: {csv_file}")
+                            
+                        else:
+                            print(f"      ❌ {ticker}: нет данных")
+                            
+                    except Exception as e:
+                        print(f"      ❌ {ticker}: ошибка - {e}")
+        
+        # Create summary report
+        summary_report = data_dir / "historical_data_summary.md"
+        with open(summary_report, 'w', encoding='utf-8') as f:
+            f.write("# Исторические данные фьючерсов\n\n")
+            f.write(f"Дата создания: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            f.write("## Сводка по годам\n\n")
+            
+            for year in historical_periods.keys():
+                year_files = [f for f in saved_files if f['year'] == year]
+                f.write(f"### {year} год\n\n")
+                
+                for asset_type in ['BR', 'GD', 'NG']:
+                    asset_files = [f for f in year_files if f['asset_type'] == asset_type]
+                    if asset_files:
+                        f.write(f"#### {asset_type} ({len(asset_files)} контрактов)\n\n")
+                        for file_info in asset_files:
+                            f.write(f"- **{file_info['ticker']}**: {file_info['records']} записей, {file_info['price_range']}\n")
+                        f.write("\n")
+            
+            f.write("## Статистика\n\n")
+            f.write(f"- Всего сохранено файлов: {len(saved_files)}\n")
+            f.write(f"- Общее количество записей: {sum(f['records'] for f in saved_files)}\n")
+            
+            # Asset type statistics
+            asset_stats = {}
+            for file_info in saved_files:
+                asset_type = file_info['asset_type']
+                if asset_type not in asset_stats:
+                    asset_stats[asset_type] = {'count': 0, 'records': 0}
+                asset_stats[asset_type]['count'] += 1
+                asset_stats[asset_type]['records'] += file_info['records']
+            
+            f.write("### По типам активов\n\n")
+            for asset_type, stats in asset_stats.items():
+                f.write(f"- **{asset_type}**: {stats['count']} контрактов, {stats['records']} записей\n")
+        
+        print(f"\n📊 СВОДКА СОХРАНЕННЫХ ДАННЫХ:")
+        print("=" * 50)
+        print(f"📁 Директория: {data_dir}")
+        print(f"📄 Всего файлов: {len(saved_files)}")
+        print(f"📊 Общее количество записей: {sum(f['records'] for f in saved_files)}")
+        
+        # Show statistics by asset type
+        asset_stats = {}
+        for file_info in saved_files:
+            asset_type = file_info['asset_type']
+            if asset_type not in asset_stats:
+                asset_stats[asset_type] = {'count': 0, 'records': 0}
+            asset_stats[asset_type]['count'] += 1
+            asset_stats[asset_type]['records'] += file_info['records']
+        
+        print(f"\n📈 По типам активов:")
+        for asset_type, stats in asset_stats.items():
+            print(f"   {asset_type}: {stats['count']} контрактов, {stats['records']} записей")
+        
+        print(f"\n📋 Отчет сохранен в: {summary_report}")
+        
+        return saved_files
+        
+    except Exception as e:
+        print(f"❌ Ошибка в сохранении исторических данных: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 def main():
     """Run all tests."""
     print("🚀 Starting MOEX futures information tests...")
@@ -534,6 +694,7 @@ def main():
     test_quarterly_futures_2022_2025()
     test_historical_vs_active_futures()
     test_historical_futures_download()
+    test_save_historical_futures_data()
     
     print("\n" + "=" * 60)
     print("🎉 All futures information tests completed!")
