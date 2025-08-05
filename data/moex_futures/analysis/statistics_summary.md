@@ -36,28 +36,28 @@
 
 ## Asset Type Distribution
 
-- **MX** (Индекс МосБиржи): 252 contracts
-- **ZN** (Цинк): 252 contracts
-- **EU** (Евро): 252 contracts
-- **US** (Доллар США): 252 contracts
-- **RU** (Рубль): 252 contracts
-- **PA** (Палладий): 252 contracts
-- **PL** (Платина): 252 contracts
-- **AG** (Серебро (альтернативный код)): 252 contracts
-- **AU** (Золото (альтернативный код)): 252 contracts
-- **CU** (Медь (альтернативный код)): 252 contracts
-- **PB** (Свинец): 252 contracts
-- **SN** (Олово): 252 contracts
-- **NI** (Никель): 252 contracts
-- **MM** (Индекс МосБиржи (мини)): 252 contracts
-- **AL** (Алюминий): 252 contracts
-- **CO** (Медь): 252 contracts
-- **SB** (Сахар): 252 contracts
-- **NG** (Природный газ): 252 contracts
-- **CL** (Нефть WTI): 252 contracts
-- **SI** (Серебро): 252 contracts
-- **GD** (Золото): 252 contracts
-- **BR** (Нефть Brent): 252 contracts
-- **RI** (Индекс РТС): 252 contracts
-- **MY** (Индекс МосБиржи в юанях): 252 contracts
-- **CN** (Юань): 252 contracts
+- **MX** (MOEX): 252 contracts
+- **ZN** (Zinc): 252 contracts
+- **EU** (EUR): 252 contracts
+- **US** (USD): 252 contracts
+- **RU** (Ruble): 252 contracts
+- **PA** (Palladium): 252 contracts
+- **PL** (Platinum): 252 contracts
+- **AG** (Silver_Alt): 252 contracts
+- **AU** (Gold_Alt): 252 contracts
+- **CU** (Copper_Alt): 252 contracts
+- **PB** (Lead): 252 contracts
+- **SN** (Tin): 252 contracts
+- **NI** (Nickel): 252 contracts
+- **MM** (MOEX_Mini): 252 contracts
+- **AL** (Aluminum): 252 contracts
+- **CO** (Copper): 252 contracts
+- **SB** (Sugar): 252 contracts
+- **NG** (Natural_Gas): 252 contracts
+- **CL** (WTI): 252 contracts
+- **SI** (Silver): 252 contracts
+- **GD** (Gold): 252 contracts
+- **BR** (Brent): 252 contracts
+- **RI** (RTS): 252 contracts
+- **MY** (MOEX_CNY): 252 contracts
+- **CN** (CNY): 252 contracts
