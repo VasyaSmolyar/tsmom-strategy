@@ -183,3 +183,187 @@ class MoexLoader(DataLoader):
             empty_data = pd.DataFrame(columns=symbols, index=pd.date_range(start=start_date, end=end_date))
             empty_data.index.name = 'Date'
             return empty_data 
+    
+    def get_available_futures(self, asset_type: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get available futures tickers with trading start and expiration dates.
+        
+        Args:
+            asset_type: Optional filter for asset type (e.g., 'BR' for Brent oil)
+        
+        Returns:
+            DataFrame with futures information including:
+            - ticker: Futures ticker
+            - asset_name: Asset name
+            - trading_start: Trading start date
+            - expiration_date: Expiration date
+            - status: Contract status
+        """
+        try:
+            # MOEX ISS API endpoint for futures securities
+            url = f"{self.base_url}/engines/futures/markets/forts/securities.json"
+            
+            params = {
+                'iss.meta': 'off',
+                'iss.only': 'data'
+            }
+            
+            logger.info("Requesting available futures from MOEX API...")
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'securities' not in data or not data['securities'].get('data'):
+                logger.warning("No futures data received from MOEX API")
+                return pd.DataFrame()
+            
+            # Parse the response data
+            # MOEX API returns data with 25 columns
+            raw_data = data['securities']['data']
+            columns = data['securities']['columns']
+            
+            # Create DataFrame with futures information
+            futures_df = pd.DataFrame(raw_data, columns=columns)
+            
+            # Rename key columns for easier access
+            column_mapping = {
+                'SECID': 'ticker',
+                'SHORTNAME': 'short_name',
+                'SECNAME': 'name',
+                'LATNAME': 'lat_name',
+                'ASSETCODE': 'asset_code',
+                'LASTTRADEDATE': 'last_trade_date',
+                'LASTDELDATE': 'expiration_date',
+                'SECTYPE': 'sec_type',
+                'LOTVOLUME': 'lot_volume',
+                'MINSTEP': 'min_step',
+                'STEPPRICE': 'step_price',
+                'PREVSETTLEPRICE': 'prev_settle_price',
+                'LASTSETTLEPRICE': 'last_settle_price',
+                'PREVPRICE': 'prev_price',
+                'IMTIME': 'update_time'
+            }
+            
+            # Rename columns that exist
+            for old_col, new_col in column_mapping.items():
+                if old_col in futures_df.columns:
+                    futures_df = futures_df.rename(columns={old_col: new_col})
+            
+            # Filter by asset type if specified
+            if asset_type:
+                futures_df = futures_df[futures_df['ticker'].str.contains(asset_type, na=False)]
+                logger.info(f"Filtered to {len(futures_df)} {asset_type} futures")
+            
+            # Convert date columns to datetime
+            date_columns = ['last_trade_date', 'expiration_date', 'update_time']
+            for col in date_columns:
+                if col in futures_df.columns:
+                    futures_df[col] = pd.to_datetime(futures_df[col], errors='coerce')
+            
+            # Add current date for filtering
+            current_date = pd.Timestamp.now()
+            
+            # Add status information
+            if 'expiration_date' in futures_df.columns:
+                futures_df['is_active'] = futures_df['expiration_date'] >= current_date
+                
+                # Add days to expiration
+                futures_df['days_to_expiration'] = (
+                    futures_df['expiration_date'] - current_date
+                ).dt.days
+            else:
+                futures_df['is_active'] = False
+                futures_df['days_to_expiration'] = None
+            
+            # Sort by expiration date
+            if 'expiration_date' in futures_df.columns:
+                futures_df = futures_df.sort_values('expiration_date')
+            
+            logger.info(f"Retrieved {len(futures_df)} futures contracts")
+            
+            return futures_df
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error requesting futures data: {e}")
+            return pd.DataFrame()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return pd.DataFrame()
+    
+    def get_futures_by_type(self, asset_type: str) -> pd.DataFrame:
+        """
+        Get futures contracts for specific asset type.
+        
+        Args:
+            asset_type: Asset type (e.g., 'BR' for Brent oil, 'SI' for Silver, 'GD' for Gold)
+        
+        Returns:
+            DataFrame with futures information for the specified asset type
+        """
+        all_futures = self.get_available_futures()
+        
+        if all_futures.empty:
+            return pd.DataFrame()
+        
+        # Filter by asset type
+        filtered_futures = all_futures[all_futures['ticker'].str.contains(asset_type, na=False)]
+        
+        if filtered_futures.empty:
+            logger.warning(f"No futures found for asset type: {asset_type}")
+            return pd.DataFrame()
+        
+        logger.info(f"Found {len(filtered_futures)} futures for {asset_type}")
+        return filtered_futures
+    
+    def get_active_futures(self, asset_type: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get currently active futures contracts.
+        
+        Args:
+            asset_type: Optional filter for asset type
+        
+        Returns:
+            DataFrame with active futures information
+        """
+        futures_df = self.get_available_futures(asset_type)
+        
+        if futures_df.empty:
+            return pd.DataFrame()
+        
+        # Filter active contracts
+        active_futures = futures_df[futures_df['is_active'] == True]
+        
+        logger.info(f"Found {len(active_futures)} active futures contracts")
+        return active_futures
+    
+    def get_futures_with_data(self, start_date: str, end_date: str, asset_type: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get futures contracts that have trading data in the specified period.
+        
+        Args:
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
+            asset_type: Optional filter for asset type
+        
+        Returns:
+            DataFrame with futures that have data in the specified period
+        """
+        futures_df = self.get_available_futures(asset_type)
+        
+        if futures_df.empty:
+            return pd.DataFrame()
+        
+        # Filter futures that were active during the period
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        
+        period_futures = futures_df[
+            (futures_df['last_trade_date'] <= end_dt) & 
+            (futures_df['expiration_date'] >= start_dt)
+        ]
+        
+        logger.info(f"Found {len(period_futures)} futures active during {start_date} to {end_date}")
+        return period_futures 
