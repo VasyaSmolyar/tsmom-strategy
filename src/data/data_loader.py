@@ -7,7 +7,7 @@ import logging
 import yaml
 from .base_loader import DataLoader
 from .yahoo_loader import YahooLoader
-from .tinvest_loader import TInvestLoader
+from .moex_loader import MoexLoader
 
 
 def create_data_loader(config_path: str = "config/config.yaml") -> DataLoader:
@@ -27,8 +27,8 @@ def create_data_loader(config_path: str = "config/config.yaml") -> DataLoader:
     
     if data_source == 'Yahoo':
         return YahooLoader(config_path)
-    elif data_source == 'T-Invest':
-        return TInvestLoader(config_path)
+    elif data_source == 'MOEX':
+        return MoexLoader(config_path)
     else:
         raise ValueError(f"Unsupported data source: {data_source}")
 
