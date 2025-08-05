@@ -366,4 +366,62 @@ class MoexLoader(DataLoader):
         ]
         
         logger.info(f"Found {len(period_futures)} futures active during {start_date} to {end_date}")
-        return period_futures 
+        return period_futures
+    
+    def get_historical_futures_for_period(self, start_date: str, end_date: str, asset_type: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get all futures contracts that could have been traded during the specified period.
+        This includes both active and expired contracts that were available during the period.
+        
+        Args:
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
+            asset_type: Optional filter for asset type
+        
+        Returns:
+            DataFrame with all futures that could have been traded during the period
+        """
+        futures_df = self.get_available_futures(asset_type)
+        
+        if futures_df.empty:
+            return pd.DataFrame()
+        
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        
+        # More inclusive filter for historical data
+        # Include contracts that:
+        # 1. Started trading before or during the period AND
+        # 2. Expired after or during the period
+        # This captures contracts that were available for trading during the period
+        
+        # If we have trading_start date, use it for more accurate filtering
+        if 'trading_start' in futures_df.columns:
+            # Convert trading_start to datetime if it's not already
+            futures_df['trading_start'] = pd.to_datetime(futures_df['trading_start'], errors='coerce')
+            
+            historical_futures = futures_df[
+                (futures_df['trading_start'] <= end_dt) & 
+                (futures_df['expiration_date'] >= start_dt)
+            ]
+        else:
+            # Fallback to using last_trade_date if trading_start is not available
+            historical_futures = futures_df[
+                (futures_df['last_trade_date'] <= end_dt) & 
+                (futures_df['expiration_date'] >= start_dt)
+            ]
+        
+        # Add period information
+        historical_futures = historical_futures.copy()
+        historical_futures['period_start'] = start_date
+        historical_futures['period_end'] = end_date
+        
+        # Mark if contract was active during the period
+        current_date = pd.Timestamp.now()
+        historical_futures['was_active_in_period'] = (
+            (historical_futures['expiration_date'] >= start_dt) & 
+            (historical_futures['expiration_date'] <= end_dt)
+        )
+        
+        logger.info(f"Found {len(historical_futures)} historical futures for period {start_date} to {end_date}")
+        return historical_futures 
