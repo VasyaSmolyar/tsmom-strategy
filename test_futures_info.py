@@ -680,6 +680,483 @@ def test_save_historical_futures_data():
         traceback.print_exc()
         return []
 
+def test_download_all_historical_ohlcv_data():
+    """Test downloading all available historical OHLCV data and saving to raw_data."""
+    print("\nTesting download of all available historical OHLCV data...")
+    print("=" * 70)
+    
+    try:
+        loader = MoexLoader()
+        
+        # Define asset types to download
+        asset_types = ['BR', 'SI', 'GD', 'CL', 'NG']  # Brent, Silver, Gold, Crude Oil, Natural Gas
+        
+        # Define historical periods to cover
+        historical_periods = {
+            "2022": {
+                "start_date": "2022-01-01",
+                "end_date": "2022-12-31",
+                "description": "2022 год"
+            },
+            "2023": {
+                "start_date": "2023-01-01", 
+                "end_date": "2023-12-31",
+                "description": "2023 год"
+            },
+            "2024": {
+                "start_date": "2024-01-01",
+                "end_date": "2024-12-31", 
+                "description": "2024 год"
+            },
+            "2025": {
+                "start_date": "2025-01-01",
+                "end_date": "2025-12-31",
+                "description": "2025 год (текущий)"
+            }
+        }
+        
+        # Create raw_data directory structure
+        raw_data_dir = Path("data/raw")
+        raw_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create subdirectories for each year
+        for year in historical_periods.keys():
+            year_dir = raw_data_dir / str(year)
+            year_dir.mkdir(exist_ok=True)
+            
+            for asset_type in asset_types:
+                asset_dir = year_dir / asset_type
+                asset_dir.mkdir(exist_ok=True)
+        
+        total_downloaded = 0
+        total_files_saved = 0
+        download_summary = {}
+        
+        for year, period_info in historical_periods.items():
+            print(f"\n📅 {period_info['description']} ({period_info['start_date']} - {period_info['end_date']}):")
+            print("-" * 60)
+            
+            year_summary = {
+                'asset_types': {},
+                'total_contracts': 0,
+                'total_records': 0,
+                'files_saved': 0
+            }
+            
+            for asset_type in asset_types:
+                print(f"\n🔍 Загружаю {asset_type} фьючерсы...")
+                
+                # Get historical futures for this period and asset type
+                historical_futures = loader.get_historical_futures_for_period(
+                    period_info['start_date'], 
+                    period_info['end_date'], 
+                    asset_type
+                )
+                
+                if historical_futures.empty:
+                    print(f"   ❌ Нет доступных {asset_type} фьючерсов для {year}")
+                    year_summary['asset_types'][asset_type] = {
+                        'contracts_found': 0,
+                        'contracts_with_data': 0,
+                        'total_records': 0,
+                        'files_saved': 0
+                    }
+                    continue
+                
+                print(f"   📊 Найдено {len(historical_futures)} {asset_type} контрактов")
+                
+                asset_summary = {
+                    'contracts_found': len(historical_futures),
+                    'contracts_with_data': 0,
+                    'total_records': 0,
+                    'files_saved': 0,
+                    'contracts': []
+                }
+                
+                # Download data for each contract
+                for idx, contract in historical_futures.iterrows():
+                    ticker = contract['ticker']
+                    
+                    try:
+                        print(f"      🔍 Загружаю {ticker}...")
+                        
+                        # Download daily OHLCV data for the entire year
+                        data = loader._get_futures_data(
+                            ticker, 
+                            period_info['start_date'], 
+                            period_info['end_date']
+                        )
+                        
+                        if not data.empty:
+                            # Save to raw_data directory
+                            file_path = raw_data_dir / str(year) / asset_type / f"{ticker}_daily.csv"
+                            data.to_csv(file_path)
+                            
+                            # Create summary file
+                            summary_path = raw_data_dir / str(year) / asset_type / f"{ticker}_summary.txt"
+                            with open(summary_path, 'w', encoding='utf-8') as f:
+                                f.write(f"Ticker: {ticker}\n")
+                                f.write(f"Asset Type: {asset_type}\n")
+                                f.write(f"Year: {year}\n")
+                                f.write(f"Period: {period_info['start_date']} to {period_info['end_date']}\n")
+                                f.write(f"Records: {len(data)}\n")
+                                f.write(f"Date Range: {data.index.min()} to {data.index.max()}\n")
+                                f.write(f"Price Range: ${data['close'].min():.2f} - ${data['close'].max():.2f}\n")
+                                f.write(f"Average Volume: {data['volume'].mean():.0f}\n")
+                                f.write(f"Columns: {list(data.columns)}\n")
+                                f.write(f"File: {file_path}\n")
+                            
+                            asset_summary['contracts_with_data'] += 1
+                            asset_summary['total_records'] += len(data)
+                            asset_summary['files_saved'] += 1
+                            total_downloaded += len(data)
+                            total_files_saved += 1
+                            
+                            asset_summary['contracts'].append({
+                                'ticker': ticker,
+                                'records': len(data),
+                                'price_range': f"${data['close'].min():.2f}-${data['close'].max():.2f}",
+                                'file': str(file_path)
+                            })
+                            
+                            print(f"         ✅ {ticker}: {len(data)} записей, цена: ${data['close'].min():.2f}-${data['close'].max():.2f}")
+                        else:
+                            print(f"         ❌ {ticker}: нет данных")
+                            
+                    except Exception as e:
+                        print(f"         ❌ {ticker}: ошибка - {e}")
+                
+                year_summary['asset_types'][asset_type] = asset_summary
+                year_summary['total_contracts'] += asset_summary['contracts_found']
+                year_summary['total_records'] += asset_summary['total_records']
+                year_summary['files_saved'] += asset_summary['files_saved']
+                
+                # Print summary for this asset type
+                print(f"   📊 {asset_type}: {asset_summary['contracts_with_data']}/{asset_summary['contracts_found']} контрактов с данными")
+                print(f"      📈 Всего записей: {asset_summary['total_records']}")
+                print(f"      💾 Файлов сохранено: {asset_summary['files_saved']}")
+            
+            download_summary[year] = year_summary
+        
+        # Create comprehensive summary report
+        summary_report_path = raw_data_dir / "historical_ohlcv_summary.md"
+        with open(summary_report_path, 'w', encoding='utf-8') as f:
+            f.write("# Исторические OHLCV данные фьючерсов\n\n")
+            f.write(f"Дата создания: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(f"Директория: {raw_data_dir}\n\n")
+            
+            f.write("## Общая статистика\n\n")
+            f.write(f"- Всего загружено записей: {total_downloaded:,}\n")
+            f.write(f"- Всего сохранено файлов: {total_files_saved}\n")
+            f.write(f"- Покрытие периодов: {len(historical_periods)} лет\n")
+            f.write(f"- Типы активов: {', '.join(asset_types)}\n\n")
+            
+            f.write("## Детальная статистика по годам\n\n")
+            
+            for year, year_data in download_summary.items():
+                f.write(f"### {year} год\n\n")
+                f.write(f"- Всего контрактов: {year_data['total_contracts']}\n")
+                f.write(f"- Всего записей: {year_data['total_records']:,}\n")
+                f.write(f"- Файлов сохранено: {year_data['files_saved']}\n\n")
+                
+                f.write("#### По типам активов\n\n")
+                for asset_type, asset_data in year_data['asset_types'].items():
+                    f.write(f"**{asset_type}**:\n")
+                    f.write(f"- Контрактов найдено: {asset_data['contracts_found']}\n")
+                    f.write(f"- Контрактов с данными: {asset_data['contracts_with_data']}\n")
+                    f.write(f"- Записей: {asset_data['total_records']:,}\n")
+                    f.write(f"- Файлов: {asset_data['files_saved']}\n\n")
+                    
+                    if 'contracts' in asset_data and asset_data['contracts']:
+                        f.write("Доступные контракты:\n")
+                        for contract in asset_data['contracts']:
+                            f.write(f"- **{contract['ticker']}**: {contract['records']} записей, {contract['price_range']}\n")
+                        f.write("\n")
+            
+            f.write("## Структура файлов\n\n")
+            f.write("```\n")
+            f.write(f"{raw_data_dir}/\n")
+            for year in historical_periods.keys():
+                f.write(f"├── {year}/\n")
+                for asset_type in asset_types:
+                    f.write(f"│   ├── {asset_type}/\n")
+                    f.write(f"│   │   ├── [TICKER]_daily.csv\n")
+                    f.write(f"│   │   └── [TICKER]_summary.txt\n")
+                f.write(f"└── historical_ohlcv_summary.md\n")
+            f.write("```\n")
+        
+        # Print final summary
+        print("\n" + "=" * 70)
+        print("📊 ИТОГОВАЯ СВОДКА ЗАГРУЗКИ:")
+        print("=" * 70)
+        print(f"📁 Директория: {raw_data_dir}")
+        print(f"📈 Всего загружено записей: {total_downloaded:,}")
+        print(f"💾 Всего сохранено файлов: {total_files_saved}")
+        print(f"📅 Покрытие периодов: {len(historical_periods)} лет")
+        print(f"🔧 Типы активов: {', '.join(asset_types)}")
+        
+        # Show statistics by year
+        print(f"\n📊 По годам:")
+        for year, year_data in download_summary.items():
+            print(f"   {year}: {year_data['total_records']:,} записей, {year_data['files_saved']} файлов")
+        
+        # Show statistics by asset type
+        asset_type_stats = {}
+        for year_data in download_summary.values():
+            for asset_type, asset_data in year_data['asset_types'].items():
+                if asset_type not in asset_type_stats:
+                    asset_type_stats[asset_type] = {'records': 0, 'files': 0}
+                asset_type_stats[asset_type]['records'] += asset_data['total_records']
+                asset_type_stats[asset_type]['files'] += asset_data['files_saved']
+        
+        print(f"\n📊 По типам активов:")
+        for asset_type, stats in asset_type_stats.items():
+            print(f"   {asset_type}: {stats['records']:,} записей, {stats['files']} файлов")
+        
+        print(f"\n📋 Отчет сохранен в: {summary_report_path}")
+        
+        return {
+            'total_records': total_downloaded,
+            'total_files': total_files_saved,
+            'summary': download_summary,
+            'report_path': str(summary_report_path)
+        }
+        
+    except Exception as e:
+        print(f"❌ Ошибка в загрузке исторических OHLCV данных: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+def test_download_all_tickers_all_years():
+    """Test downloading ALL tickers for ALL years from 2010 to 2025."""
+    print("\nTesting download of ALL tickers for ALL years (2010-2025)...")
+    print("=" * 80)
+    
+    try:
+        loader = MoexLoader()
+        
+        # Define ALL asset types to download
+        asset_types = ['BR', 'SI', 'GD', 'CL', 'NG', 'SBRF', 'GAZR', 'LKOH', 'ROSN', 'TATN']
+        
+        # Define ALL years from 2010 to 2025
+        years = list(range(2010, 2026))  # 2010 to 2025
+        
+        # Create raw_data directory structure
+        raw_data_dir = Path("data/raw")
+        raw_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create subdirectories for each year
+        for year in years:
+            year_dir = raw_data_dir / str(year)
+            year_dir.mkdir(exist_ok=True)
+            
+            for asset_type in asset_types:
+                asset_dir = year_dir / asset_type
+                asset_dir.mkdir(exist_ok=True)
+        
+        total_downloaded = 0
+        total_files_saved = 0
+        download_summary = {}
+        
+        # Generate ALL possible ticker patterns for each year and asset type
+        ticker_patterns = {}
+        
+        for year in years:
+            year_suffix = str(year)[-1]  # Last digit of year
+            ticker_patterns[year] = {}
+            
+            for asset_type in asset_types:
+                # Generate all possible month codes
+                month_codes = ['H', 'J', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']
+                year_tickers = []
+                
+                for month_code in month_codes:
+                    ticker = f"{asset_type}{month_code}{year_suffix}"
+                    year_tickers.append(ticker)
+                
+                ticker_patterns[year][asset_type] = year_tickers
+        
+        for year in years:
+            print(f"\n📅 {year} год:")
+            print("-" * 60)
+            
+            year_summary = {
+                'asset_types': {},
+                'total_contracts': 0,
+                'total_records': 0,
+                'files_saved': 0
+            }
+            
+            for asset_type in asset_types:
+                print(f"\n🔍 Загружаю {asset_type} фьючерсы для {year}...")
+                
+                asset_summary = {
+                    'contracts_found': 0,
+                    'contracts_with_data': 0,
+                    'total_records': 0,
+                    'files_saved': 0,
+                    'contracts': []
+                }
+                
+                # Try ALL possible tickers for this asset type and year
+                year_tickers = ticker_patterns[year][asset_type]
+                
+                print(f"   📊 Тестирую {len(year_tickers)} возможных тикеров...")
+                
+                for ticker in year_tickers:
+                    try:
+                        # Define period for this ticker (entire year)
+                        start_date = f"{year}-01-01"
+                        end_date = f"{year}-12-31"
+                        
+                        print(f"      🔍 Тестирую {ticker} для {start_date} - {end_date}...")
+                        
+                        # Download data
+                        data = loader._get_futures_data(ticker, start_date, end_date)
+                        
+                        if not data.empty:
+                            # Save to raw_data directory
+                            file_path = raw_data_dir / str(year) / asset_type / f"{ticker}_daily.csv"
+                            data.to_csv(file_path)
+                            
+                            # Create summary file
+                            summary_path = raw_data_dir / str(year) / asset_type / f"{ticker}_summary.txt"
+                            with open(summary_path, 'w', encoding='utf-8') as f:
+                                f.write(f"Ticker: {ticker}\n")
+                                f.write(f"Asset Type: {asset_type}\n")
+                                f.write(f"Year: {year}\n")
+                                f.write(f"Period: {start_date} to {end_date}\n")
+                                f.write(f"Records: {len(data)}\n")
+                                f.write(f"Date Range: {data.index.min()} to {data.index.max()}\n")
+                                f.write(f"Price Range: ${data['close'].min():.2f} - ${data['close'].max():.2f}\n")
+                                f.write(f"Average Volume: {data['volume'].mean():.0f}\n")
+                                f.write(f"Columns: {list(data.columns)}\n")
+                                f.write(f"File: {file_path}\n")
+                            
+                            asset_summary['contracts_with_data'] += 1
+                            asset_summary['total_records'] += len(data)
+                            asset_summary['files_saved'] += 1
+                            total_downloaded += len(data)
+                            total_files_saved += 1
+                            
+                            asset_summary['contracts'].append({
+                                'ticker': ticker,
+                                'records': len(data),
+                                'price_range': f"${data['close'].min():.2f}-${data['close'].max():.2f}",
+                                'file': str(file_path)
+                            })
+                            
+                            print(f"         ✅ {ticker}: {len(data)} записей, цена: ${data['close'].min():.2f}-${data['close'].max():.2f}")
+                        else:
+                            print(f"         ❌ {ticker}: нет данных")
+                            
+                    except Exception as e:
+                        print(f"         ❌ {ticker}: ошибка - {e}")
+                
+                asset_summary['contracts_found'] = len(year_tickers)
+                year_summary['asset_types'][asset_type] = asset_summary
+                year_summary['total_contracts'] += asset_summary['contracts_found']
+                year_summary['total_records'] += asset_summary['total_records']
+                year_summary['files_saved'] += asset_summary['files_saved']
+                
+                # Print summary for this asset type
+                print(f"   📊 {asset_type}: {asset_summary['contracts_with_data']}/{asset_summary['contracts_found']} контрактов с данными")
+                print(f"      📈 Всего записей: {asset_summary['total_records']}")
+                print(f"      💾 Файлов сохранено: {asset_summary['files_saved']}")
+            
+            download_summary[year] = year_summary
+        
+        # Create comprehensive summary report
+        summary_report_path = raw_data_dir / "all_tickers_all_years_summary.md"
+        with open(summary_report_path, 'w', encoding='utf-8') as f:
+            f.write("# ВСЕ тикеры ВСЕХ лет (2010-2025)\n\n")
+            f.write(f"Дата создания: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(f"Директория: {raw_data_dir}\n\n")
+            
+            f.write("## Общая статистика\n\n")
+            f.write(f"- Всего загружено записей: {total_downloaded:,}\n")
+            f.write(f"- Всего сохранено файлов: {total_files_saved}\n")
+            f.write(f"- Покрытие периодов: {len(years)} лет (2010-2025)\n")
+            f.write(f"- Типы активов: {', '.join(asset_types)}\n\n")
+            
+            f.write("## Детальная статистика по годам\n\n")
+            
+            for year, year_data in download_summary.items():
+                f.write(f"### {year} год\n\n")
+                f.write(f"- Всего контрактов: {year_data['total_contracts']}\n")
+                f.write(f"- Всего записей: {year_data['total_records']:,}\n")
+                f.write(f"- Файлов сохранено: {year_data['files_saved']}\n\n")
+                
+                f.write("#### По типам активов\n\n")
+                for asset_type, asset_data in year_data['asset_types'].items():
+                    f.write(f"**{asset_type}**:\n")
+                    f.write(f"- Контрактов найдено: {asset_data['contracts_found']}\n")
+                    f.write(f"- Контрактов с данными: {asset_data['contracts_with_data']}\n")
+                    f.write(f"- Записей: {asset_data['total_records']:,}\n")
+                    f.write(f"- Файлов: {asset_data['files_saved']}\n\n")
+                    
+                    if 'contracts' in asset_data and asset_data['contracts']:
+                        f.write("Доступные контракты:\n")
+                        for contract in asset_data['contracts']:
+                            f.write(f"- **{contract['ticker']}**: {contract['records']} записей, {contract['price_range']}\n")
+                        f.write("\n")
+            
+            f.write("## Структура файлов\n\n")
+            f.write("```\n")
+            f.write(f"{raw_data_dir}/\n")
+            for year in years:
+                f.write(f"├── {year}/\n")
+                for asset_type in asset_types:
+                    f.write(f"│   ├── {asset_type}/\n")
+                    f.write(f"│   │   ├── [TICKER]_daily.csv\n")
+                    f.write(f"│   │   └── [TICKER]_summary.txt\n")
+                f.write(f"└── all_tickers_all_years_summary.md\n")
+            f.write("```\n")
+        
+        # Print final summary
+        print("\n" + "=" * 80)
+        print("📊 ИТОГОВАЯ СВОДКА ЗАГРУЗКИ ВСЕХ ТИКЕРОВ:")
+        print("=" * 80)
+        print(f"📁 Директория: {raw_data_dir}")
+        print(f"📈 Всего загружено записей: {total_downloaded:,}")
+        print(f"💾 Всего сохранено файлов: {total_files_saved}")
+        print(f"📅 Покрытие периодов: {len(years)} лет (2010-2025)")
+        print(f"🔧 Типы активов: {', '.join(asset_types)}")
+        
+        # Show statistics by year
+        print(f"\n📊 По годам:")
+        for year, year_data in download_summary.items():
+            print(f"   {year}: {year_data['total_records']:,} записей, {year_data['files_saved']} файлов")
+        
+        # Show statistics by asset type
+        asset_type_stats = {}
+        for year_data in download_summary.values():
+            for asset_type, asset_data in year_data['asset_types'].items():
+                if asset_type not in asset_type_stats:
+                    asset_type_stats[asset_type] = {'records': 0, 'files': 0}
+                asset_type_stats[asset_type]['records'] += asset_data['total_records']
+                asset_type_stats[asset_type]['files'] += asset_data['files_saved']
+        
+        print(f"\n📊 По типам активов:")
+        for asset_type, stats in asset_type_stats.items():
+            print(f"   {asset_type}: {stats['records']:,} записей, {stats['files']} файлов")
+        
+        print(f"\n📋 Отчет сохранен в: {summary_report_path}")
+        
+        return {
+            'total_records': total_downloaded,
+            'total_files': total_files_saved,
+            'summary': download_summary,
+            'report_path': str(summary_report_path)
+        }
+        
+    except Exception as e:
+        print(f"❌ Ошибка в загрузке всех тикеров всех лет: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
 def main():
     """Run all tests."""
     print("🚀 Starting MOEX futures information tests...")
@@ -696,9 +1173,46 @@ def main():
     test_historical_futures_download()
     test_save_historical_futures_data()
     
+    # Add the new comprehensive OHLCV download test
+    # test_download_all_historical_ohlcv_data()
+    
+    # Add the new ALL tickers download test
+    test_download_all_tickers_all_years()
+    
     print("\n" + "=" * 60)
     print("🎉 All futures information tests completed!")
     print("=" * 60)
 
+def run_ohlcv_download_test():
+    """Run only the OHLCV download test."""
+    print("🚀 Starting OHLCV download test...")
+    print("=" * 60)
+    
+    # Run only the OHLCV download test
+    test_download_all_historical_ohlcv_data()
+    
+    print("\n" + "=" * 60)
+    print("🎉 OHLCV download test completed!")
+    print("=" * 60)
+
+def run_all_tickers_download_test():
+    """Run only the ALL tickers download test."""
+    print("🚀 Starting ALL tickers download test...")
+    print("=" * 60)
+    
+    # Run only the ALL tickers download test
+    test_download_all_tickers_all_years()
+    
+    print("\n" + "=" * 60)
+    print("🎉 ALL tickers download test completed!")
+    print("=" * 60)
+
 if __name__ == "__main__":
+    # Uncomment the line below to run only the OHLCV download test
+    # run_ohlcv_download_test()
+    
+    # Uncomment the line below to run only the ALL tickers download test
+    # run_all_tickers_download_test()
+    
+    # Or run all tests
     main() 
