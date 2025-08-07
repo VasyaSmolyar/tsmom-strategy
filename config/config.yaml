@@ -9,7 +9,7 @@ strategy:
 
 # Data Parameters
 data:
-  source: "Yahoo"  # Data source: "Yahoo" or "MOEX"
+  source: "MOEX"  # Data source: "Yahoo" or "MOEX"
   start_date: "2000-01-01"
   end_date: "2023-12-31"
   frequency: "D"  # Daily data
@@ -70,7 +70,7 @@ assets:
 backtest:
   initial_capital: 1000000  # $1M starting capital
   rebalance_frequency: "M"  # Monthly rebalancing
-  benchmark: "^GSPC"        # S&P 500 as benchmark
+  benchmark: "IMOEX"        # IMOEX as benchmark for MOEX data
 
 # Risk Management
 risk:

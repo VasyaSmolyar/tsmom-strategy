@@ -1,59 +1,59 @@
 # TSMOM Strategy Performance Report
 
-Generated on: 2025-08-04 22:41:47
+Generated on: 2025-08-07 19:58:26
 
 ## Executive Summary
 
-- **Total Return**: 17461.53%
-- **Annual Return**: 31.05%
-- **Volatility**: 18.63%
-- **Sharpe Ratio**: 1.67
-- **Maximum Drawdown**: -41.00%
+- **Total Return**: 22.40%
+- **Annual Return**: 1.46%
+- **Volatility**: 2.30%
+- **Sharpe Ratio**: 0.63
+- **Maximum Drawdown**: -3.24%
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Total Return | 174.62 |
-| Annual Return | 0.3105 |
-| Volatility | 0.1863 |
-| Sharpe Ratio | 1.67 |
-| Sortino Ratio | 2.31 |
-| Calmar Ratio | 0.7572 |
-| Max Drawdown | -0.4100 |
-| Max Underwater Duration | 423 |
-| Var 95 | -0.0155 |
-| Cvar 95 | -0.0255 |
-| Win Rate | 0.5586 |
-| Avg Win | 0.008122 |
-| Avg Loss | -0.007693 |
-| Profit Factor | 1.34 |
-| Skewness | 0.4646 |
-| Kurtosis | 11.97 |
-| Num Periods | 4817 |
-| Benchmark Total Return | 3.10 |
-| Benchmark Annual Return | 0.0766 |
-| Benchmark Volatility | 0.1940 |
-| Benchmark Sharpe Ratio | 0.3948 |
-| Excess Return | 0.1951 |
-| Tracking Error | 0.3092 |
-| Information Ratio | 0.6312 |
-| Beta | -0.3091 |
-| Alpha | 0.2188 |
+| Total Return | 0.2240 |
+| Annual Return | 0.0146 |
+| Volatility | 0.0230 |
+| Sharpe Ratio | 0.6333 |
+| Sortino Ratio | 0.8881 |
+| Calmar Ratio | 0.4496 |
+| Max Drawdown | -0.0324 |
+| Max Underwater Duration | 436 |
+| Var 95 | -0.001916 |
+| Cvar 95 | -0.003010 |
+| Win Rate | 0.5273 |
+| Avg Win | 0.000922 |
+| Avg Loss | -0.000907 |
+| Profit Factor | 1.14 |
+| Skewness | 2.79 |
+| Kurtosis | 92.90 |
+| Num Periods | 3520 |
+| Benchmark Total Return | 0.9179 |
+| Benchmark Annual Return | 0.0477 |
+| Benchmark Volatility | 0.2312 |
+| Benchmark Sharpe Ratio | 0.2064 |
+| Excess Return | -0.0597 |
+| Tracking Error | 0.2394 |
+| Information Ratio | -0.2496 |
+| Beta | -0.0310 |
+| Alpha | -0.0583 |
 
 ## Risk Analysis
 
-- **Value at Risk (95%)**: -0.0155
-- **Conditional VaR (95%)**: -0.0255
-- **Skewness**: 0.4646
-- **Kurtosis**: 11.9686
+- **Value at Risk (95%)**: -0.0019
+- **Conditional VaR (95%)**: -0.0030
+- **Skewness**: 2.7885
+- **Kurtosis**: 92.9028
 
 ## Benchmark Comparison
 
-- **Excess Return**: 19.51%
-- **Information Ratio**: 0.63
-- **Beta**: -0.3091
-- **Alpha**: 21.88%
+- **Excess Return**: -5.97%
+- **Information Ratio**: -0.25
+- **Beta**: -0.0310
+- **Alpha**: -5.83%
 
 ## Generated Plots
 

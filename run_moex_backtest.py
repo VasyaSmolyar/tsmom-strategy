@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Quick start script for TSMOM backtest.
-Run this script to execute the complete backtest pipeline.
+MOEX Backtest Script for TSMOM Strategy.
+Runs backtest using MOEX data and compares performance with IMOEX index.
 """
 
 import sys
@@ -12,26 +12,50 @@ sys.path.append(str(Path(__file__).parent / "src"))
 
 from main import run_full_backtest, setup_logging
 import logging
+import yaml
 
 def main():
-    """Run the complete TSMOM backtest."""
-    print("TSMOM Backtest - Quick Start")
+    """Run the TSMOM backtest with MOEX data and IMOEX benchmark."""
+    print("TSMOM Backtest with MOEX Data")
     print("=" * 50)
     
     # Setup logging
     setup_logging("INFO")
     logger = logging.getLogger(__name__)
     
+    # Load configuration
+    config_path = "config/config.yaml"
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    
+    # Verify we're using MOEX data source
+    data_source = config['data'].get('source', 'Yahoo')
+    benchmark = config['backtest'].get('benchmark', '^GSPC')
+    
+    if data_source != 'MOEX':
+        print(f"WARNING: Data source is set to '{data_source}', not 'MOEX'")
+        print("Please update config/config.yaml to use MOEX data source")
+        return
+    
+    if benchmark != 'IMOEX':
+        print(f"WARNING: Benchmark is set to '{benchmark}', not 'IMOEX'")
+        print("Please update config/config.yaml to use IMOEX benchmark")
+        return
+    
+    print(f"Data Source: {data_source}")
+    print(f"Benchmark: {benchmark}")
+    print("=" * 50)
+    
     try:
         # Run the complete backtest
         results = run_full_backtest(
-            config_path="config/config.yaml",
+            config_path=config_path,
             download_data=True,
             generate_report=True
         )
         
         print("\n" + "=" * 50)
-        print("BACKTEST COMPLETED SUCCESSFULLY!")
+        print("MOEX BACKTEST COMPLETED SUCCESSFULLY!")
         print("=" * 50)
         
         # Print summary
@@ -44,14 +68,7 @@ def main():
             print(f"Max Drawdown: {metrics.get('max_drawdown', 0):.2%}")
             
             if 'benchmark_annual_return' in metrics:
-                # Determine benchmark name based on config
-                import yaml
-                with open("config/config.yaml", 'r') as file:
-                    config = yaml.safe_load(file)
-                data_source = config['data'].get('source', 'Yahoo')
-                benchmark_name = "IMOEX" if data_source == "MOEX" else "S&P500"
-                
-                print(f"\nBenchmark Comparison ({benchmark_name}):")
+                print(f"\nBenchmark Comparison (IMOEX):")
                 print(f"Benchmark Return: {metrics.get('benchmark_annual_return', 0):.2%}")
                 print(f"Excess Return: {metrics.get('excess_return', 0):.2%}")
                 print(f"Information Ratio: {metrics.get('information_ratio', 0):.2f}")
@@ -64,10 +81,19 @@ def main():
         print(f"\nReports saved to: reports/")
         print(f"Log file: tsmom_backtest.log")
         
+        # Print data information
+        if results.get('prices') is not None:
+            prices = results['prices']
+            print(f"\nData Summary:")
+            print(f"Assets: {len(prices.columns)}")
+            print(f"Periods: {len(prices)}")
+            print(f"Date Range: {prices.index.min()} to {prices.index.max()}")
+            print(f"Assets: {list(prices.columns)}")
+        
     except Exception as e:
-        logger.error(f"Error during backtest: {e}")
+        logger.error(f"Error during MOEX backtest: {e}")
         print(f"\nERROR: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

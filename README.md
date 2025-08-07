@@ -13,8 +13,14 @@ pip install -r requirements.txt
 
 ### Run Backtest
 ```bash
-# Quick start
+# Quick start (uses IMOEX benchmark for MOEX data)
 python run_backtest.py
+
+# MOEX-specific backtest with IMOEX benchmark
+python run_moex_backtest.py
+
+# Detailed IMOEX comparison
+python compare_with_imoex.py
 
 # Or use main module
 python src/main.py
@@ -36,6 +42,7 @@ The strategy uses 20+ assets across multiple asset classes:
 - **Bonds**: Treasury yields, bond ETFs
 - **Currencies**: Major FX pairs (EUR/USD, GBP/USD, etc.)
 - **Commodities**: Gold, oil, agricultural futures
+- **Russian Futures**: MOEX futures (Si, GOLD, RTS, GAZR, etc.)
 
 ## 📁 Project Structure
 
@@ -45,6 +52,7 @@ tsmom_backtest/
 │   └── config.yaml        # Strategy parameters
 ├── data/                  # Data storage
 │   ├── raw/              # Raw downloaded data
+│   │   └── moex/         # MOEX futures data files
 │   └── processed/        # Cleaned data
 ├── src/                   # Source code
 │   ├── data/             # Data handling modules
@@ -65,9 +73,12 @@ tsmom_backtest/
 
 ### Data Management
 - ✅ Automatic data download from Yahoo Finance
+- ✅ **NEW**: MOEX futures data loading from local CSV files
+- ✅ **NEW**: Comprehensive data integrity checks
 - ✅ Data cleaning and validation
 - ✅ Support for multiple asset classes
 - ✅ Historical data from 2000 to present
+- ✅ **NEW**: Support for 16+ Russian futures contracts
 
 ### Strategy Implementation
 - ✅ Time Series Momentum signals
@@ -77,7 +88,7 @@ tsmom_backtest/
 
 ### Performance Analysis
 - ✅ Comprehensive performance metrics
-- ✅ Benchmark comparison (S&P 500)
+- ✅ Benchmark comparison (S&P 500 / IMOEX for MOEX data)
 - ✅ Risk analysis (VaR, CVaR, drawdown)
 - ✅ Rolling performance analysis
 - ✅ Sensitivity analysis
