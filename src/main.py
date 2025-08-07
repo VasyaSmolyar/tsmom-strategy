@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import argparse
+import yaml
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent))
@@ -79,9 +80,35 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         analyzer = PerformanceAnalyzer()
         
         # Get benchmark data aligned with strategy start
-        benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
-            strategy_results['returns']
-        )
+        # Check if we're using MOEX data source
+        with open(config_path, 'r') as file:
+            import yaml
+            config = yaml.safe_load(file)
+        
+        data_source = config['data'].get('source', 'Yahoo')
+        benchmark_symbol = config['backtest'].get('benchmark', '^GSPC')
+        
+        if data_source == 'MOEX' and benchmark_symbol == 'IMOEX':
+            # For MOEX data, load IMOEX benchmark from the same data loader
+            logger.info("Loading IMOEX benchmark data from MOEX loader...")
+            imoex_data = loader.load_imoex_data()
+            if not imoex_data.empty:
+                # Calculate IMOEX returns
+                imoex_returns = imoex_data['IMOEX'].pct_change().dropna()
+                # Align with strategy start
+                strategy_start_date = analyzer.get_strategy_start_date_dt(strategy_results['returns'])
+                benchmark_returns = imoex_returns[imoex_returns.index >= strategy_start_date]
+                logger.info(f"Loaded IMOEX benchmark data: {len(benchmark_returns)} periods")
+            else:
+                logger.warning("No IMOEX data available, using default benchmark")
+                benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+                    strategy_results['returns']
+                )
+        else:
+            # Use default benchmark (S&P 500)
+            benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+                strategy_results['returns']
+            )
         
         # Generate comprehensive report with alignment
         analysis_results = analyzer.generate_comprehensive_report(

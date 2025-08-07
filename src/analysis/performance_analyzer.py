@@ -411,18 +411,25 @@ class PerformanceAnalyzer:
         buffer_start_str = buffer_start.strftime('%Y-%m-%d')
         
         try:
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(start=buffer_start_str, end=end_date)
-            benchmark_returns = data['Close'].pct_change().dropna()
-            
-            # Normalize timezone to UTC and then remove timezone info
-            benchmark_returns.index = benchmark_returns.index.tz_localize(None)
-            
-            logger.info(f"Downloaded benchmark data for {symbol} from {buffer_start_str}")
-            logger.info(f"Strategy start date: {start_date}")
-            logger.info(f"Benchmark data points: {len(benchmark_returns)}")
-            
-            return benchmark_returns
+            # For IMOEX, we need to use a different approach since it's not available on Yahoo Finance
+            if symbol == "IMOEX":
+                # Try to load IMOEX data from local files or use alternative source
+                logger.info("Loading IMOEX benchmark data from local files...")
+                # This will be handled by the data loader
+                return pd.Series()
+            else:
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(start=buffer_start_str, end=end_date)
+                benchmark_returns = data['Close'].pct_change().dropna()
+                
+                # Normalize timezone to UTC and then remove timezone info
+                benchmark_returns.index = benchmark_returns.index.tz_localize(None)
+                
+                logger.info(f"Downloaded benchmark data for {symbol} from {buffer_start_str}")
+                logger.info(f"Strategy start date: {start_date}")
+                logger.info(f"Benchmark data points: {len(benchmark_returns)}")
+                
+                return benchmark_returns
         except Exception as e:
             logger.error(f"Error downloading benchmark data: {e}")
             return pd.Series()
