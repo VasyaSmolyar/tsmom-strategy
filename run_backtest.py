@@ -44,7 +44,14 @@ def main():
             print(f"Max Drawdown: {metrics.get('max_drawdown', 0):.2%}")
             
             if 'benchmark_annual_return' in metrics:
-                print(f"\nBenchmark Comparison (S&P500):")
+                # Determine benchmark name based on config
+                import yaml
+                with open("config/config.yaml", 'r') as file:
+                    config = yaml.safe_load(file)
+                data_source = config['data'].get('source', 'Yahoo')
+                benchmark_name = "IMOEX" if data_source == "MOEX" else "S&P500"
+                
+                print(f"\nBenchmark Comparison ({benchmark_name}):")
                 print(f"Benchmark Return: {metrics.get('benchmark_annual_return', 0):.2%}")
                 print(f"Excess Return: {metrics.get('excess_return', 0):.2%}")
                 print(f"Information Ratio: {metrics.get('information_ratio', 0):.2f}")
@@ -52,7 +59,7 @@ def main():
                 print(f"Alpha: {metrics.get('alpha', 0):.2%}")
                 
                 # Print strategy start date info
-                print(f"\nNote: Comparison period starts from strategy application date (2004-11-10)")
+                print(f"\nNote: Comparison period starts from strategy application date")
         
         print(f"\nReports saved to: reports/")
         print(f"Log file: tsmom_backtest.log")

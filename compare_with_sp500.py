@@ -238,7 +238,8 @@ def main():
         analysis_results = analyzer.generate_comprehensive_report(
             strategy_results['returns'],
             benchmark_returns,
-            align_with_strategy_start=True
+            align_with_strategy_start=True,
+            data_source="Yahoo"
         )
         
         print("\n" + "="*50)

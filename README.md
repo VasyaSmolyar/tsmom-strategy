@@ -13,8 +13,14 @@ pip install -r requirements.txt
 
 ### Run Backtest
 ```bash
-# Quick start
+# Quick start (uses IMOEX benchmark for MOEX data)
 python run_backtest.py
+
+# MOEX-specific backtest with IMOEX benchmark
+python run_moex_backtest.py
+
+# Detailed IMOEX comparison
+python compare_with_imoex.py
 
 # Or use main module
 python src/main.py
@@ -82,7 +88,7 @@ tsmom_backtest/
 
 ### Performance Analysis
 - ✅ Comprehensive performance metrics
-- ✅ Benchmark comparison (S&P 500)
+- ✅ Benchmark comparison (S&P 500 / IMOEX for MOEX data)
 - ✅ Risk analysis (VaR, CVaR, drawdown)
 - ✅ Rolling performance analysis
 - ✅ Sensitivity analysis

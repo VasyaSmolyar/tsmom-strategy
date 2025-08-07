@@ -114,7 +114,8 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         analysis_results = analyzer.generate_comprehensive_report(
             strategy_results['returns'],
             benchmark_returns,
-            align_with_strategy_start=True
+            align_with_strategy_start=True,
+            data_source=data_source
         )
         
         logger.info("Performance analysis completed")
