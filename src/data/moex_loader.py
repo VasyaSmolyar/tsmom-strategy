@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class MoexLoader(DataLoader):
-    """MOEX API data loader implementation with futures support."""
+    """MOEX API data loader implementation with futures and index support."""
     
     def __init__(self, config_path: str = "config/config.yaml"):
         """Initialize MOEX loader with configuration."""
@@ -25,6 +25,7 @@ class MoexLoader(DataLoader):
         self.api_token = None  # Placeholder for API token
         self.base_url = "https://iss.moex.com/iss"  # MOEX ISS API URL
         self.futures_dir = self.raw_dir / "moex"
+        self.imoex_dir = self.raw_dir / "moex" / "imoex"
         
     def _parse_futures_filename(self, filename: str) -> Tuple[str, str, str]:
         """
@@ -268,6 +269,62 @@ class MoexLoader(DataLoader):
             logger.warning("No valid futures data found")
             return pd.DataFrame()
     
+    def load_imoex_data(self) -> pd.DataFrame:
+        """
+        Load IMOEX index data from local CSV files.
+        
+        Returns:
+            DataFrame with IMOEX price data
+        """
+        if not self.imoex_dir.exists():
+            logger.warning(f"IMOEX directory {self.imoex_dir} does not exist")
+            return pd.DataFrame()
+        
+        # Get all IMOEX CSV files
+        csv_files = list(self.imoex_dir.glob("IMOEX_*.csv"))
+        if not csv_files:
+            logger.warning(f"No IMOEX CSV files found in {self.imoex_dir}")
+            return pd.DataFrame()
+        
+        logger.info(f"Found {len(csv_files)} IMOEX data files")
+        
+        # Load all files for IMOEX
+        imoex_data = []
+        for filepath in sorted(csv_files):
+            df = self._load_futures_file(filepath)
+            if not df.empty:
+                imoex_data.append(df)
+        
+        if imoex_data:
+            # Combine all data for IMOEX
+            combined_df = pd.concat(imoex_data, axis=0)
+            
+            # Remove duplicates and sort
+            combined_df = combined_df[~combined_df.index.duplicated(keep='first')]
+            combined_df = combined_df.sort_index()
+            
+            # Check integrity
+            integrity_report = self._check_data_integrity(combined_df, 'IMOEX')
+            
+            if integrity_report['status'] == 'OK':
+                logger.info(f"Successfully loaded IMOEX: {len(combined_df)} data points")
+            else:
+                logger.warning(f"Data integrity issues for IMOEX: {integrity_report['issues']}")
+            
+            # Create DataFrame with IMOEX data
+            result_df = pd.DataFrame({'IMOEX': combined_df['CLOSE']})
+            result_df.index.name = 'Date'
+            
+            # Save raw data
+            raw_file = self.raw_dir / "raw_imoex_moex.csv"
+            result_df.to_csv(raw_file)
+            logger.info(f"Saved IMOEX data to {raw_file}")
+            
+            return result_df
+        else:
+            logger.warning("No valid IMOEX data found")
+            return pd.DataFrame()
+    
     def _log_integrity_summary(self, integrity_reports: List[Dict]) -> None:
         """
         Log a summary of data integrity checks.
@@ -295,7 +352,7 @@ class MoexLoader(DataLoader):
                      end_date: Optional[str] = None) -> pd.DataFrame:
         """
         Download historical price data for given symbols using MOEX API.
-        Also loads futures data from local files.
+        Also loads futures data and IMOEX index data from local files.
         
         Args:
             symbols: List of symbols to download. If None, uses config assets.
@@ -319,11 +376,33 @@ class MoexLoader(DataLoader):
         # Load futures data from local files
         futures_data = self.load_futures_data(symbols)
         
+        # Load IMOEX index data
+        imoex_data = self.load_imoex_data()
+        
+        # Combine futures and IMOEX data
+        combined_data = pd.DataFrame()
+        
         if not futures_data.empty:
+            combined_data = futures_data
             logger.info(f"Successfully loaded futures data with {len(futures_data.columns)} symbols")
-            return futures_data
+        
+        if not imoex_data.empty:
+            if combined_data.empty:
+                combined_data = imoex_data
+            else:
+                # Merge IMOEX data with futures data
+                combined_data = combined_data.join(imoex_data, how='outer')
+            logger.info(f"Successfully loaded IMOEX index data")
+        
+        if not combined_data.empty:
+            # Save combined raw data
+            raw_file = self.raw_dir / "raw_prices_moex.csv"
+            combined_data.to_csv(raw_file)
+            logger.info(f"Saved combined data to {raw_file}")
+            
+            return combined_data
         else:
-            logger.warning("No futures data available, returning empty DataFrame")
+            logger.warning("No data available, returning empty DataFrame")
             # Create empty DataFrame with proper structure
             empty_data = pd.DataFrame(columns=symbols, index=pd.date_range(start=start_date, end=end_date))
             empty_data.index.name = 'Date'
