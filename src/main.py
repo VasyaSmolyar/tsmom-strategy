@@ -71,6 +71,27 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     strategy = TSMOMStrategy(config_path)
     strategy_results = strategy.run_strategy(daily_returns)
     
+    # Generate and save trade history CSV
+    try:
+        initial_capital = 1_000_000.0
+        try:
+            initial_capital = float(
+                loader.config.get('backtest', {}).get('initial_capital', initial_capital)
+            )
+        except Exception:
+            pass
+        trade_log = strategy.generate_trade_log(
+            strategy_results['weights'],
+            daily_returns,
+            strategy_results['returns'],
+            prices,
+            initial_capital=initial_capital,
+        )
+        logger.info(f"Generated trade history with {len(trade_log)} trades")
+    except Exception as e:
+        logger.warning(f"Failed to generate trade history: {e}")
+        trade_log = None
+    
     logger.info("Strategy execution completed")
     logger.info(f"Strategy returns: {len(strategy_results['returns'])} periods")
     
@@ -146,6 +167,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         'daily_returns': daily_returns,
         'monthly_returns': monthly_returns,
         'strategy_results': strategy_results,
+        'trade_log': trade_log,
         'analysis_results': analysis_results,
         'timestamp': datetime.now().isoformat()
     }
