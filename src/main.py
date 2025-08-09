@@ -80,12 +80,16 @@ def run_full_backtest(config_path: str = "config/config.yaml",
             )
         except Exception:
             pass
+        # Determine suffix by data source using existing config
+        data_source_for_suffix = loader.config['data'].get('source', 'Yahoo').lower()
+        suffix = 'moex' if data_source_for_suffix == 'moex' else 'yahoo'
         trade_log = strategy.generate_trade_log(
             strategy_results['weights'],
             daily_returns,
             strategy_results['returns'],
             prices,
             initial_capital=initial_capital,
+            output_suffix=suffix,
         )
         logger.info(f"Generated trade history with {len(trade_log)} trades")
     except Exception as e:

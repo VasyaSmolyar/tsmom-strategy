@@ -253,6 +253,7 @@ class TSMOMStrategy:
         strategy_returns: pd.Series,
         prices: Optional[pd.DataFrame] = None,
         initial_capital: float = 1_000_000.0,
+        output_suffix: Optional[str] = None,
     ) -> pd.DataFrame:
         """
         Generate trade history from weights and returns and save to CSV.
@@ -405,7 +406,8 @@ class TSMOMStrategy:
         # Save CSV
         reports_dir = Path('reports')
         (reports_dir / 'tables').mkdir(parents=True, exist_ok=True)
-        out_path = reports_dir / 'tables' / 'trade_history.csv'
+        suffix_part = f"_{output_suffix}" if output_suffix else ""
+        out_path = reports_dir / 'tables' / f'trade_history{suffix_part}.csv'
         trades_df.to_csv(out_path, index=False)
         logger.info(f"Saved trade history to {out_path}")
         
