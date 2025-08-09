@@ -23,11 +23,12 @@ def main():
     logger = logging.getLogger(__name__)
     
     try:
-        # Run the complete backtest
+        # Run the complete backtest with Yahoo data
         results = run_full_backtest(
             config_path="config/config.yaml",
             download_data=True,
-            generate_report=True
+            generate_report=True,
+            data_source="Yahoo"
         )
         
         print("\n" + "=" * 50)
@@ -44,12 +45,8 @@ def main():
             print(f"Max Drawdown: {metrics.get('max_drawdown', 0):.2%}")
             
             if 'benchmark_annual_return' in metrics:
-                # Determine benchmark name based on config
-                import yaml
-                with open("config/config.yaml", 'r') as file:
-                    config = yaml.safe_load(file)
-                data_source = config['data'].get('source', 'Yahoo')
-                benchmark_name = "IMOEX" if data_source == "MOEX" else "S&P500"
+                # Using Yahoo data, so benchmark is S&P500
+                benchmark_name = "S&P500"
                 
                 print(f"\nBenchmark Comparison ({benchmark_name}):")
                 print(f"Benchmark Return: {metrics.get('benchmark_annual_return', 0):.2%}")

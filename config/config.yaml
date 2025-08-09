@@ -9,7 +9,6 @@ strategy:
 
 # Data Parameters
 data:
-  source: "MOEX"  # Data source: "Yahoo" or "MOEX"
   start_date: "2000-01-01"
   end_date: "2023-12-31"
   frequency: "D"  # Daily data

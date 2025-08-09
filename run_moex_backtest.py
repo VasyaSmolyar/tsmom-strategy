@@ -23,35 +23,20 @@ def main():
     setup_logging("INFO")
     logger = logging.getLogger(__name__)
     
-    # Load configuration
+    # Configuration path
     config_path = "config/config.yaml"
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
     
-    # Verify we're using MOEX data source
-    data_source = config['data'].get('source', 'Yahoo')
-    benchmark = config['backtest'].get('benchmark', '^GSPC')
-    
-    if data_source != 'MOEX':
-        print(f"WARNING: Data source is set to '{data_source}', not 'MOEX'")
-        print("Please update config/config.yaml to use MOEX data source")
-        return
-    
-    if benchmark != 'IMOEX':
-        print(f"WARNING: Benchmark is set to '{benchmark}', not 'IMOEX'")
-        print("Please update config/config.yaml to use IMOEX benchmark")
-        return
-    
-    print(f"Data Source: {data_source}")
-    print(f"Benchmark: {benchmark}")
+    print(f"Data Source: MOEX")
+    print(f"Benchmark: IMOEX")
     print("=" * 50)
     
     try:
-        # Run the complete backtest
+        # Run the complete backtest with MOEX data
         results = run_full_backtest(
             config_path=config_path,
             download_data=True,
-            generate_report=True
+            generate_report=True,
+            data_source="MOEX"
         )
         
         print("\n" + "=" * 50)

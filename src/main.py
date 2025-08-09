@@ -32,7 +32,8 @@ def setup_logging(log_level: str = "INFO") -> None:
 
 def run_full_backtest(config_path: str = "config/config.yaml",
                      download_data: bool = True,
-                     generate_report: bool = True) -> dict:
+                     generate_report: bool = True,
+                     data_source: str = "Yahoo") -> dict:
     """
     Run the complete TSMOM backtest.
     
@@ -40,6 +41,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         config_path: Path to configuration file
         download_data: Whether to download fresh data
         generate_report: Whether to generate performance report
+        data_source: Data source to use ("Yahoo" or "MOEX")
     
     Returns:
         Dictionary with all results
@@ -50,7 +52,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     
     # Step 1: Data Loading and Processing
     logger.info("Step 1: Loading and processing data...")
-    loader = create_data_loader(config_path)
+    loader = create_data_loader(config_path, data_source)
     
     if download_data:
         logger.info("Downloading fresh data...")
@@ -80,9 +82,8 @@ def run_full_backtest(config_path: str = "config/config.yaml",
             )
         except Exception:
             pass
-        # Determine suffix by data source using existing config
-        data_source_for_suffix = loader.config['data'].get('source', 'Yahoo').lower()
-        suffix = 'moex' if data_source_for_suffix == 'moex' else 'yahoo'
+        # Determine suffix by data source
+        suffix = 'moex' if data_source.lower() == 'moex' else 'yahoo'
         trade_log = strategy.generate_trade_log(
             strategy_results['weights'],
             daily_returns,
@@ -106,14 +107,9 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         
         # Get benchmark data aligned with strategy start
         # Check if we're using MOEX data source
-        with open(config_path, 'r') as file:
-            import yaml
-            config = yaml.safe_load(file)
+        benchmark_symbol = '^GSPC'  # Default to S&P 500
         
-        data_source = config['data'].get('source', 'Yahoo')
-        benchmark_symbol = config['backtest'].get('benchmark', '^GSPC')
-        
-        if data_source == 'MOEX' and benchmark_symbol == 'IMOEX':
+        if data_source == 'MOEX':
             # For MOEX data, load IMOEX benchmark from the same data loader
             logger.info("Loading IMOEX benchmark data from MOEX loader...")
             imoex_data = loader.load_imoex_data()
@@ -179,12 +175,13 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     return results
 
 
-def run_sensitivity_analysis(config_path: str = "config/config.yaml") -> dict:
+def run_sensitivity_analysis(config_path: str = "config/config.yaml", data_source: str = "Yahoo") -> dict:
     """
     Run sensitivity analysis with different parameters.
     
     Args:
         config_path: Path to configuration file
+        data_source: Data source to use ("Yahoo" or "MOEX")
     
     Returns:
         Dictionary with sensitivity analysis results
@@ -193,7 +190,7 @@ def run_sensitivity_analysis(config_path: str = "config/config.yaml") -> dict:
     logger.info("Running sensitivity analysis...")
     
     # Load data
-    loader = create_data_loader(config_path)
+    loader = create_data_loader(config_path, data_source)
     prices = loader.load_processed_data()
     returns = loader.calculate_returns(prices, 'D')
     
@@ -238,6 +235,9 @@ def main():
                        help='Skip report generation')
     parser.add_argument('--sensitivity', action='store_true',
                        help='Run sensitivity analysis')
+    parser.add_argument('--data-source', default='Yahoo',
+                       choices=['Yahoo', 'MOEX'],
+                       help='Data source to use')
     
     args = parser.parse_args()
     
@@ -248,14 +248,15 @@ def main():
     try:
         if args.sensitivity:
             logger.info("Running sensitivity analysis...")
-            results = run_sensitivity_analysis(args.config)
+            results = run_sensitivity_analysis(args.config, args.data_source)
             logger.info("Sensitivity analysis completed")
         else:
             logger.info("Running full backtest...")
             results = run_full_backtest(
                 config_path=args.config,
                 download_data=not args.no_download,
-                generate_report=not args.no_report
+                generate_report=not args.no_report,
+                data_source=args.data_source
             )
             logger.info("Full backtest completed")
         

@@ -10,21 +10,17 @@ from .yahoo_loader import YahooLoader
 from .moex_loader import MoexLoader
 
 
-def create_data_loader(config_path: str = "config/config.yaml") -> DataLoader:
+def create_data_loader(config_path: str = "config/config.yaml", data_source: str = "Yahoo") -> DataLoader:
     """
-    Factory function to create appropriate data loader based on configuration.
+    Factory function to create appropriate data loader based on data source parameter.
     
     Args:
         config_path: Path to configuration file
+        data_source: Data source to use ("Yahoo" or "MOEX")
     
     Returns:
         Appropriate DataLoader instance
     """
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    
-    data_source = config['data'].get('source', 'Yahoo')
-    
     if data_source == 'Yahoo':
         return YahooLoader(config_path)
     elif data_source == 'MOEX':
