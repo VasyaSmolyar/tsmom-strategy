@@ -39,8 +39,9 @@ class TSMOMStrategy:
         # Risk management parameters
         self.volatility_lookback = self.risk_config['volatility_lookback']  # months
         self.max_position_size = self.risk_config['max_position_size']
+        self.stop_loss = self.risk_config.get('stop_loss', 0.05)  # Stop loss threshold
         
-        logger.info(f"Initialized TSMOM strategy with lookback={self.lookback_period} months")
+        logger.info(f"Initialized TSMOM strategy with lookback={self.lookback_period} months, stop_loss={self.stop_loss}")
     
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file."""
@@ -100,6 +101,81 @@ class TSMOMStrategy:
         
         return volatility
     
+    def apply_stop_loss(self, signals: pd.DataFrame, returns: pd.DataFrame, 
+                       prices: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply stop loss rules to momentum signals.
+        
+        Args:
+            signals: DataFrame with momentum signals
+            returns: DataFrame with asset returns
+            prices: DataFrame with asset prices
+        
+        Returns:
+            DataFrame with signals adjusted for stop loss
+        """
+        logger.info("Applying stop loss rules...")
+        
+        adjusted_signals = signals.copy()
+        
+        # Track entry prices for open positions
+        entry_prices = {}
+        
+        for date in signals.index:
+            if date not in prices.index:
+                continue
+                
+            current_prices = prices.loc[date]
+            current_signals = signals.loc[date]
+            
+            for asset in signals.columns:
+                if asset not in current_prices.index:
+                    continue
+                    
+                current_signal = current_signals[asset]
+                current_price = current_prices[asset]
+                
+                if pd.isna(current_signal) or pd.isna(current_price):
+                    continue
+                
+                # Check if we're entering a new position
+                prev_date_idx = signals.index.get_loc(date) - 1
+                if prev_date_idx >= 0:
+                    prev_date = signals.index[prev_date_idx]
+                    prev_signal = signals.loc[prev_date, asset]
+                    
+                    # New position entry
+                    if (prev_signal == 0 or pd.isna(prev_signal)) and current_signal != 0:
+                        entry_prices[asset] = current_price
+                    # Position exit
+                    elif prev_signal != 0 and current_signal == 0:
+                        if asset in entry_prices:
+                            del entry_prices[asset]
+                else:
+                    # First observation
+                    if current_signal != 0:
+                        entry_prices[asset] = current_price
+                
+                # Check stop loss for existing positions
+                if asset in entry_prices and current_signal != 0:
+                    entry_price = entry_prices[asset]
+                    
+                    # Calculate loss from entry
+                    if current_signal > 0:  # Long position
+                        loss = (entry_price - current_price) / entry_price
+                    else:  # Short position
+                        loss = (current_price - entry_price) / entry_price
+                    
+                    # Trigger stop loss
+                    if loss > self.stop_loss:
+                        adjusted_signals.loc[date, asset] = 0
+                        if asset in entry_prices:
+                            del entry_prices[asset]
+                        logger.debug(f"Stop loss triggered for {asset} on {date}, loss: {loss:.2%}")
+        
+        logger.info("Stop loss rules applied")
+        return adjusted_signals
+    
     def calculate_position_sizes(self, signals: pd.DataFrame, 
                                volatility: pd.DataFrame) -> pd.DataFrame:
         """
@@ -152,12 +228,14 @@ class TSMOMStrategy:
         
         return position_sizes
     
-    def generate_portfolio_weights(self, returns: pd.DataFrame) -> pd.DataFrame:
+    def generate_portfolio_weights(self, returns: pd.DataFrame, 
+                                  prices: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
         Generate complete portfolio weights for the TSMOM strategy.
         
         Args:
             returns: DataFrame with asset returns
+            prices: DataFrame with asset prices (needed for stop loss)
         
         Returns:
             DataFrame with portfolio weights
@@ -166,6 +244,12 @@ class TSMOMStrategy:
         
         # Calculate momentum signals
         signals = self.calculate_momentum_signals(returns)
+        
+        # Apply stop loss if prices are available
+        if prices is not None:
+            signals = self.apply_stop_loss(signals, returns, prices)
+        else:
+            logger.warning("No prices provided, skipping stop loss application")
         
         # Calculate volatility
         volatility = self.calculate_volatility(returns)
@@ -215,12 +299,13 @@ class TSMOMStrategy:
         
         return net_returns
     
-    def run_strategy(self, returns: pd.DataFrame) -> Dict:
+    def run_strategy(self, returns: pd.DataFrame, prices: Optional[pd.DataFrame] = None) -> Dict:
         """
         Run the complete TSMOM strategy.
         
         Args:
             returns: DataFrame with asset returns
+            prices: DataFrame with asset prices (needed for stop loss)
         
         Returns:
             Dictionary with strategy results
@@ -228,7 +313,7 @@ class TSMOMStrategy:
         logger.info("Running TSMOM strategy...")
         
         # Generate portfolio weights
-        weights = self.generate_portfolio_weights(returns)
+        weights = self.generate_portfolio_weights(returns, prices)
         
         # Calculate strategy returns
         strategy_returns = self.calculate_strategy_returns(weights, returns)

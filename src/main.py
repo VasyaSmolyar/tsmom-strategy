@@ -71,7 +71,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     # Step 2: Strategy Execution
     logger.info("Step 2: Executing TSMOM strategy...")
     strategy = TSMOMStrategy(config_path)
-    strategy_results = strategy.run_strategy(daily_returns)
+    strategy_results = strategy.run_strategy(daily_returns, prices)
     
     # Generate and save trade history CSV
     try:

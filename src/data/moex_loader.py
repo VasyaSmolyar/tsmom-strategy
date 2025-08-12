@@ -27,6 +27,46 @@ class MoexLoader(DataLoader):
         self.futures_dir = self.raw_dir / "moex"
         self.imoex_dir = self.raw_dir / "moex" / "imoex"
         
+        # Mapping of MOEX ticker symbols to their file names
+        self.moex_ticker_mapping = {
+            'Si': 'USDRUB',
+            'Eu': 'EURUSD', 
+            'CNY': 'CNYUSD',
+            'GAZR': 'GAZPROM',
+            'SBRF': 'SBERBANK',
+            'LKOH': 'LUKOIL',
+            'ROSN': 'ROSNEFT',
+            'VTBR': 'VTB',
+            'GMKN': 'NORILSK',
+            'RTS': 'RTS_INDEX',
+            'MIX': 'MOEX_INDEX',
+            'BZ': 'BRENT_OIL',
+            'NG': 'NATURAL_GAS',
+            'GOLD': 'GOLD_FUTURES',
+            'SILV': 'SILVER',
+            'PLT': 'PLATINUM'
+        }
+    
+    def get_asset_universe(self) -> List[str]:
+        """Get MOEX futures tickers available in the data files."""
+        if not self.futures_dir.exists():
+            logger.warning(f"Futures directory {self.futures_dir} does not exist")
+            return []
+        
+        # Get all CSV files and extract unique tickers
+        csv_files = list(self.futures_dir.glob("*.csv"))
+        available_tickers = set()
+        
+        for filepath in csv_files:
+            try:
+                ticker, _, _ = self._parse_futures_filename(filepath.name)
+                available_tickers.add(ticker)
+            except ValueError:
+                continue
+        
+        # Return list of available tickers (these are the actual MOEX symbols)
+        return sorted(list(available_tickers))
+        
     def _parse_futures_filename(self, filename: str) -> Tuple[str, str, str]:
         """
         Parse futures filename to extract ticker and date range.
@@ -91,11 +131,32 @@ class MoexLoader(DataLoader):
             # Clean column names
             df.columns = [col.replace('<', '').replace('>', '') for col in df.columns]
             
-            # Convert date
-            df['DATE'] = pd.to_datetime(df['DATE'], format='%y%m%d')
+            # Convert date - try different formats
+            try:
+                df['DATE'] = pd.to_datetime(df['DATE'], format='%y%m%d')
+            except ValueError:
+                try:
+                    # Try YYYYMMDD format for newer files
+                    df['DATE'] = pd.to_datetime(df['DATE'], format='%Y%m%d')
+                except ValueError:
+                    try:
+                        # Try as string conversion first 
+                        df['DATE'] = df['DATE'].astype(str)
+                        # Filter out invalid date strings (too short or non-numeric)
+                        df = df[df['DATE'].str.len() >= 6]
+                        df = df[df['DATE'].str.isdigit()]
+                        # Try parsing again
+                        df['DATE'] = pd.to_datetime(df['DATE'], format='%y%m%d', errors='coerce')
+                        df = df.dropna(subset=['DATE'])
+                    except Exception:
+                        logger.warning(f"Could not parse dates in {filepath}")
+                        return pd.DataFrame()
             
             # Set date as index
             df.set_index('DATE', inplace=True)
+            
+            # Filter out dates before 2000 (invalid parsed dates)
+            df = df[df.index >= '2000-01-01']
             
             # Convert numeric columns
             numeric_cols = ['OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOL']
