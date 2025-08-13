@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 class YahooLoader(DataLoader):
     """Yahoo Finance data loader implementation."""
     
+    def __init__(self, config_path: str = "config/config.yaml"):
+        """Initialize Yahoo loader with configuration."""
+        super().__init__(config_path)
+        self._source_suffix = 'yahoo'
+    
     def download_data(self, symbols: Optional[List[str]] = None, 
                      start_date: Optional[str] = None,
                      end_date: Optional[str] = None) -> pd.DataFrame:
@@ -31,7 +36,7 @@ class YahooLoader(DataLoader):
             DataFrame with OHLCV data for all symbols
         """
         if symbols is None:
-            symbols = self.get_asset_universe()
+            symbols = self.get_yahoo_asset_universe()
         
         if start_date is None:
             start_date = self.config['data']['start_date']
@@ -75,4 +80,22 @@ class YahooLoader(DataLoader):
             
             return combined_data
         else:
-            raise ValueError("No data was successfully downloaded") 
+            raise ValueError("No data was successfully downloaded")
+    
+    def get_yahoo_asset_universe(self) -> List[str]:
+        """Get the asset universe suitable for Yahoo Finance (exclude Russian assets)."""
+        assets = []
+        asset_config = self.config['assets']
+        
+        # Only include non-Russian assets for Yahoo Finance
+        for category_name, category in asset_config.items():
+            if isinstance(category, list):
+                # Skip Russian assets for Yahoo loader
+                if category_name in ['russian_equities']:
+                    continue
+                # Filter out MOEX assets from other categories
+                filtered_assets = [asset for asset in category if not asset.endswith('.ME')]
+                assets.extend(filtered_assets)
+        
+        logger.info(f"Yahoo asset universe: {len(assets)} assets - {assets}")
+        return assets 

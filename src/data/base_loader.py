@@ -61,6 +61,45 @@ class DataLoader(ABC):
         """
         pass
     
+
+    
+    def calculate_returns(self, prices: pd.DataFrame, 
+                         frequency: str = 'D') -> pd.DataFrame:
+        """
+        Calculate returns from price data.
+        
+        Args:
+            prices: Price DataFrame
+            frequency: Return frequency ('D' for daily, 'M' for monthly)
+        
+        Returns:
+            Returns DataFrame
+        """
+        if frequency == 'D':
+            returns = prices.pct_change().dropna()
+        elif frequency == 'M':
+            # Resample to monthly and calculate returns
+            monthly_prices = prices.resample('ME').last()
+            returns = monthly_prices.pct_change().dropna()
+        else:
+            raise ValueError(f"Unsupported frequency: {frequency}")
+        
+        return returns
+    
+    def load_processed_data(self) -> pd.DataFrame:
+        """Load previously processed data if available."""
+        # Use different file names for different data sources
+        source_suffix = getattr(self, '_source_suffix', 'default')
+        processed_file = self.processed_dir / f"cleaned_prices_{source_suffix}.csv"
+        
+        if processed_file.exists():
+            logger.info(f"Loading processed data from {processed_file}")
+            return pd.read_csv(processed_file, index_col=0, parse_dates=True)
+        else:
+            logger.info("No processed data found. Downloading and processing...")
+            raw_data = self.download_data()
+            return self.clean_data(raw_data)
+    
     def clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Clean and preprocess the downloaded data.
@@ -103,44 +142,10 @@ class DataLoader(ABC):
         logger.info(f"Cleaned data shape: {data.shape}")
         logger.info(f"Assets after cleaning: {list(data.columns)}")
         
-        # Save cleaned data
-        cleaned_file = self.processed_dir / "cleaned_prices.csv"
+        # Save cleaned data with source-specific filename
+        source_suffix = getattr(self, '_source_suffix', 'default')
+        cleaned_file = self.processed_dir / f"cleaned_prices_{source_suffix}.csv"
         data.to_csv(cleaned_file)
         logger.info(f"Saved cleaned data to {cleaned_file}")
         
-        return data
-    
-    def calculate_returns(self, prices: pd.DataFrame, 
-                         frequency: str = 'D') -> pd.DataFrame:
-        """
-        Calculate returns from price data.
-        
-        Args:
-            prices: Price DataFrame
-            frequency: Return frequency ('D' for daily, 'M' for monthly)
-        
-        Returns:
-            Returns DataFrame
-        """
-        if frequency == 'D':
-            returns = prices.pct_change().dropna()
-        elif frequency == 'M':
-            # Resample to monthly and calculate returns
-            monthly_prices = prices.resample('ME').last()
-            returns = monthly_prices.pct_change().dropna()
-        else:
-            raise ValueError(f"Unsupported frequency: {frequency}")
-        
-        return returns
-    
-    def load_processed_data(self) -> pd.DataFrame:
-        """Load previously processed data if available."""
-        processed_file = self.processed_dir / "cleaned_prices.csv"
-        
-        if processed_file.exists():
-            logger.info(f"Loading processed data from {processed_file}")
-            return pd.read_csv(processed_file, index_col=0, parse_dates=True)
-        else:
-            logger.info("No processed data found. Downloading and processing...")
-            raw_data = self.download_data()
-            return self.clean_data(raw_data) 
+        return data 

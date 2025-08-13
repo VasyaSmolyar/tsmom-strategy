@@ -22,6 +22,7 @@ class MoexLoader(DataLoader):
     def __init__(self, config_path: str = "config/config.yaml"):
         """Initialize MOEX loader with configuration."""
         super().__init__(config_path)
+        self._source_suffix = 'moex'
         self.api_token = None  # Placeholder for API token
         self.base_url = "https://iss.moex.com/iss"  # MOEX ISS API URL
         self.futures_dir = self.raw_dir / "moex"
@@ -66,6 +67,30 @@ class MoexLoader(DataLoader):
         
         # Return list of available tickers (these are the actual MOEX symbols)
         return sorted(list(available_tickers))
+    
+    def get_moex_asset_universe(self) -> List[str]:
+        """Get the asset universe suitable for MOEX (only Russian assets and available futures)."""
+        # Get available futures tickers from MOEX data files
+        available_futures = self.get_asset_universe()
+        
+        # Start with futures and use set to avoid duplicates
+        assets = set(available_futures)
+        asset_config = self.config['assets']
+        
+        # Include Russian assets and MOEX assets for MOEX loader
+        for category_name, category in asset_config.items():
+            if isinstance(category, list):
+                # Only include Russian-specific assets for MOEX
+                if category_name in ['russian_equities']:
+                    assets.update(category)
+                # Include MOEX assets from other categories
+                moex_assets = [asset for asset in category if asset.endswith('.ME')]
+                assets.update(moex_assets)
+        
+        # Convert back to sorted list
+        assets_list = sorted(list(assets))
+        logger.info(f"MOEX asset universe: {len(assets_list)} assets - {assets_list}")
+        return assets_list
         
     def _parse_futures_filename(self, filename: str) -> Tuple[str, str, str]:
         """
@@ -424,7 +449,7 @@ class MoexLoader(DataLoader):
             DataFrame with OHLCV data for all symbols
         """
         if symbols is None:
-            symbols = self.get_asset_universe()
+            symbols = self.get_moex_asset_universe()
         
         if start_date is None:
             start_date = self.config['data']['start_date']
