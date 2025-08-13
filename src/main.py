@@ -8,11 +8,12 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import argparse
+import yaml
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from data.data_loader import DataLoader
+from data.data_loader import create_data_loader
 from strategy.tsmom_strategy import TSMOMStrategy
 from analysis.performance_analyzer import PerformanceAnalyzer
 
@@ -31,7 +32,8 @@ def setup_logging(log_level: str = "INFO") -> None:
 
 def run_full_backtest(config_path: str = "config/config.yaml",
                      download_data: bool = True,
-                     generate_report: bool = True) -> dict:
+                     generate_report: bool = True,
+                     data_source: str = "Yahoo") -> dict:
     """
     Run the complete TSMOM backtest.
     
@@ -39,6 +41,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         config_path: Path to configuration file
         download_data: Whether to download fresh data
         generate_report: Whether to generate performance report
+        data_source: Data source to use ("Yahoo" or "MOEX")
     
     Returns:
         Dictionary with all results
@@ -49,7 +52,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     
     # Step 1: Data Loading and Processing
     logger.info("Step 1: Loading and processing data...")
-    loader = DataLoader(config_path)
+    loader = create_data_loader(config_path, data_source)
     
     if download_data:
         logger.info("Downloading fresh data...")
@@ -68,7 +71,36 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     # Step 2: Strategy Execution
     logger.info("Step 2: Executing TSMOM strategy...")
     strategy = TSMOMStrategy(config_path)
-    strategy_results = strategy.run_strategy(daily_returns)
+    strategy_results = strategy.run_strategy(daily_returns, prices)
+    
+    # Generate and save trade history CSV
+    try:
+        initial_capital = 1_000_000.0
+        try:
+            initial_capital = float(
+                loader.config.get('backtest', {}).get('initial_capital', initial_capital)
+            )
+        except Exception:
+            pass
+        # Determine reports directory by data source
+        data_source_suffix = data_source.lower() if data_source else ""
+        if data_source_suffix:
+            trade_reports_dir = f'reports/{data_source_suffix}'
+        else:
+            trade_reports_dir = 'reports'
+        
+        trade_log = strategy.generate_trade_log(
+            strategy_results['weights'],
+            daily_returns,
+            strategy_results['returns'],
+            prices,
+            initial_capital=initial_capital,
+            reports_dir=trade_reports_dir,
+        )
+        logger.info(f"Generated trade history with {len(trade_log)} trades")
+    except Exception as e:
+        logger.warning(f"Failed to generate trade history: {e}")
+        trade_log = None
     
     logger.info("Strategy execution completed")
     logger.info(f"Strategy returns: {len(strategy_results['returns'])} periods")
@@ -76,18 +108,42 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     # Step 3: Performance Analysis
     if generate_report:
         logger.info("Step 3: Generating performance analysis...")
-        analyzer = PerformanceAnalyzer()
+        # Determine data source suffix for subdirectory
+        data_source_suffix = data_source.lower() if data_source else ""
+        analyzer = PerformanceAnalyzer(data_source_suffix=data_source_suffix)
         
         # Get benchmark data aligned with strategy start
-        benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
-            strategy_results['returns']
-        )
+        # Check if we're using MOEX data source
+        benchmark_symbol = '^GSPC'  # Default to S&P 500
+        
+        if data_source == 'MOEX':
+            # For MOEX data, load IMOEX benchmark from the same data loader
+            logger.info("Loading IMOEX benchmark data from MOEX loader...")
+            imoex_data = loader.load_imoex_data()
+            if not imoex_data.empty:
+                # Calculate IMOEX returns
+                imoex_returns = imoex_data['IMOEX'].pct_change().dropna()
+                # Align with strategy start
+                strategy_start_date = analyzer.get_strategy_start_date_dt(strategy_results['returns'])
+                benchmark_returns = imoex_returns[imoex_returns.index >= strategy_start_date]
+                logger.info(f"Loaded IMOEX benchmark data: {len(benchmark_returns)} periods")
+            else:
+                logger.warning("No IMOEX data available, using default benchmark")
+                benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+                    strategy_results['returns']
+                )
+        else:
+            # Use default benchmark (S&P 500)
+            benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+                strategy_results['returns']
+            )
         
         # Generate comprehensive report with alignment
         analysis_results = analyzer.generate_comprehensive_report(
             strategy_results['returns'],
             benchmark_returns,
-            align_with_strategy_start=True
+            align_with_strategy_start=True,
+            data_source=data_source
         )
         
         logger.info("Performance analysis completed")
@@ -118,6 +174,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         'daily_returns': daily_returns,
         'monthly_returns': monthly_returns,
         'strategy_results': strategy_results,
+        'trade_log': trade_log,
         'analysis_results': analysis_results,
         'timestamp': datetime.now().isoformat()
     }
@@ -125,12 +182,13 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     return results
 
 
-def run_sensitivity_analysis(config_path: str = "config/config.yaml") -> dict:
+def run_sensitivity_analysis(config_path: str = "config/config.yaml", data_source: str = "Yahoo") -> dict:
     """
     Run sensitivity analysis with different parameters.
     
     Args:
         config_path: Path to configuration file
+        data_source: Data source to use ("Yahoo" or "MOEX")
     
     Returns:
         Dictionary with sensitivity analysis results
@@ -139,7 +197,7 @@ def run_sensitivity_analysis(config_path: str = "config/config.yaml") -> dict:
     logger.info("Running sensitivity analysis...")
     
     # Load data
-    loader = DataLoader(config_path)
+    loader = create_data_loader(config_path, data_source)
     prices = loader.load_processed_data()
     returns = loader.calculate_returns(prices, 'D')
     
@@ -155,7 +213,7 @@ def run_sensitivity_analysis(config_path: str = "config/config.yaml") -> dict:
         strategy.lookback_period = lookback
         
         # Run strategy
-        results = strategy.run_strategy(returns)
+        results = strategy.run_strategy(returns, prices)
         
         # Calculate basic metrics
         metrics = strategy.calculate_performance_metrics(results['returns'])
@@ -184,6 +242,9 @@ def main():
                        help='Skip report generation')
     parser.add_argument('--sensitivity', action='store_true',
                        help='Run sensitivity analysis')
+    parser.add_argument('--data-source', default='Yahoo',
+                       choices=['Yahoo', 'MOEX'],
+                       help='Data source to use')
     
     args = parser.parse_args()
     
@@ -194,14 +255,15 @@ def main():
     try:
         if args.sensitivity:
             logger.info("Running sensitivity analysis...")
-            results = run_sensitivity_analysis(args.config)
+            results = run_sensitivity_analysis(args.config, args.data_source)
             logger.info("Sensitivity analysis completed")
         else:
             logger.info("Running full backtest...")
             results = run_full_backtest(
                 config_path=args.config,
                 download_data=not args.no_download,
-                generate_report=not args.no_report
+                generate_report=not args.no_report,
+                data_source=args.data_source
             )
             logger.info("Full backtest completed")
         

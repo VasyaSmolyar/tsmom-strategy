@@ -133,7 +133,13 @@ class TestTSMOMStrategy:
     
     def test_full_strategy_run(self, strategy, sample_returns):
         """Test complete strategy execution."""
-        results = strategy.run_strategy(sample_returns)
+        # Create mock prices (starting at 100 for each asset)
+        sample_prices = pd.DataFrame(
+            100 * (1 + sample_returns).cumprod(),
+            index=sample_returns.index,
+            columns=sample_returns.columns
+        )
+        results = strategy.run_strategy(sample_returns, sample_prices)
         
         # Check results structure
         assert 'weights' in results

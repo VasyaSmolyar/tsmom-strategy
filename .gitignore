@@ -32,11 +32,11 @@ ENV/
 .ipynb_checkpoints
 
 # Data files
-data/raw/
 data/processed/
 *.csv
 *.xlsx
 *.xls
+!data/raw/moex/*
 
 # Logs
 *.log

@@ -24,12 +24,27 @@ assets:
     - "^N225"  # Nikkei 225
     - "^GDAXI" # DAX
     - "^FCHI"  # CAC 40
+    - "IMOEX.ME"  # MOEX Index
+    - "RTSI.ME"   # RTS Index
+  
+  russian_equities:
+    - "SBER.ME"   # Sberbank
+    - "GAZP.ME"   # Gazprom
+    - "LKOH.ME"   # Lukoil
+    - "NVTK.ME"   # Novatek
+    - "YNDX.ME"   # Yandex
+    - "VKUS.ME"   # VK
+    - "POLY.ME"   # Polymetal
+    - "NLMK.ME"   # NLMK
+    - "MAGN.ME"   # Magnit
+    - "CHMF.ME"   # Severstal
   
   bonds:
     - "^TNX"   # 10Y Treasury
     - "^TYX"   # 30Y Treasury
     - "TLT"    # 20+ Year Treasury Bond ETF
     - "IEF"    # 7-10 Year Treasury Bond ETF
+    - "OFZ.ME" # Russian Government Bonds
   
   currencies:
     - "EURUSD=X"  # EUR/USD
@@ -37,6 +52,8 @@ assets:
     - "JPYUSD=X"  # JPY/USD
     - "CHFUSD=X"  # CHF/USD
     - "CADUSD=X"  # CAD/USD
+    - "USDRUB=X"  # USD/RUB
+    - "EURRUB=X"  # EUR/RUB
   
   commodities:
     - "GC=F"   # Gold Futures
@@ -45,12 +62,14 @@ assets:
     - "ZS=F"   # Soybean Futures
     - "KC=F"   # Coffee Futures
     - "CT=F"   # Cotton Futures
+    - "BR.ME"  # Brent Oil (MOEX)
+    - "GOLD.ME" # Gold (MOEX)
 
 # Backtest Parameters
 backtest:
   initial_capital: 1000000  # $1M starting capital
   rebalance_frequency: "M"  # Monthly rebalancing
-  benchmark: "^GSPC"        # S&P 500 as benchmark
+  benchmark: "IMOEX"        # IMOEX as benchmark for MOEX data
 
 # Risk Management
 risk:

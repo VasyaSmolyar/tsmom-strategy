@@ -25,10 +25,20 @@ logger = logging.getLogger(__name__)
 class PerformanceAnalyzer:
     """Analyzes and visualizes TSMOM strategy performance."""
     
-    def __init__(self, reports_dir: str = "reports"):
-        """Initialize PerformanceAnalyzer."""
+    def __init__(self, reports_dir: str = "reports", data_source_suffix: str = ""):
+        """Initialize PerformanceAnalyzer.
+        
+        Args:
+            reports_dir: Base directory for reports
+            data_source_suffix: Suffix for subdirectory (e.g., "yahoo", "moex")
+        """
         self.reports_dir = Path(reports_dir)
         self.reports_dir.mkdir(exist_ok=True)
+        
+        # Add data source suffix if provided
+        if data_source_suffix:
+            self.reports_dir = self.reports_dir / data_source_suffix.lower()
+            self.reports_dir.mkdir(exist_ok=True)
         
         # Create subdirectories
         (self.reports_dir / "plots").mkdir(exist_ok=True)
@@ -161,7 +171,8 @@ class PerformanceAnalyzer:
     
     def plot_cumulative_returns(self, strategy_returns: pd.Series,
                                benchmark_returns: Optional[pd.Series] = None,
-                               title: str = "Cumulative Returns") -> None:
+                               title: str = "Cumulative Returns",
+                               data_source: str = "Yahoo") -> None:
         """Plot cumulative returns comparison."""
         plt.figure(figsize=(12, 8))
         
@@ -173,8 +184,10 @@ class PerformanceAnalyzer:
         # Benchmark cumulative returns
         if benchmark_returns is not None:
             benchmark_cumulative = (1 + benchmark_returns.dropna()).cumprod()
+            # Use appropriate benchmark label based on data source
+            benchmark_label = 'Benchmark (IMOEX)' if data_source == 'MOEX' else 'Benchmark (S&P 500)'
             plt.plot(benchmark_cumulative.index, benchmark_cumulative.values, 
-                    label='Benchmark (S&P 500)', linewidth=2, alpha=0.7)
+                    label=benchmark_label, linewidth=2, alpha=0.7)
         
         plt.title(title, fontsize=16, fontweight='bold')
         plt.xlabel('Date', fontsize=12)
@@ -411,18 +424,25 @@ class PerformanceAnalyzer:
         buffer_start_str = buffer_start.strftime('%Y-%m-%d')
         
         try:
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(start=buffer_start_str, end=end_date)
-            benchmark_returns = data['Close'].pct_change().dropna()
-            
-            # Normalize timezone to UTC and then remove timezone info
-            benchmark_returns.index = benchmark_returns.index.tz_localize(None)
-            
-            logger.info(f"Downloaded benchmark data for {symbol} from {buffer_start_str}")
-            logger.info(f"Strategy start date: {start_date}")
-            logger.info(f"Benchmark data points: {len(benchmark_returns)}")
-            
-            return benchmark_returns
+            # For IMOEX, we need to use a different approach since it's not available on Yahoo Finance
+            if symbol == "IMOEX":
+                # Try to load IMOEX data from local files or use alternative source
+                logger.info("Loading IMOEX benchmark data from local files...")
+                # This will be handled by the data loader
+                return pd.Series()
+            else:
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(start=buffer_start_str, end=end_date)
+                benchmark_returns = data['Close'].pct_change().dropna()
+                
+                # Normalize timezone to UTC and then remove timezone info
+                benchmark_returns.index = benchmark_returns.index.tz_localize(None)
+                
+                logger.info(f"Downloaded benchmark data for {symbol} from {buffer_start_str}")
+                logger.info(f"Strategy start date: {start_date}")
+                logger.info(f"Benchmark data points: {len(benchmark_returns)}")
+                
+                return benchmark_returns
         except Exception as e:
             logger.error(f"Error downloading benchmark data: {e}")
             return pd.Series()
@@ -472,7 +492,8 @@ class PerformanceAnalyzer:
     
     def generate_comprehensive_report(self, strategy_returns: pd.Series,
                                    benchmark_returns: Optional[pd.Series] = None,
-                                   align_with_strategy_start: bool = True) -> Dict:
+                                   align_with_strategy_start: bool = True,
+                                   data_source: str = "Yahoo") -> Dict:
         """
         Generate comprehensive performance report.
         
@@ -500,7 +521,7 @@ class PerformanceAnalyzer:
         metrics = self.calculate_comprehensive_metrics(strategy_returns, benchmark_returns)
         
         # Generate plots
-        self.plot_cumulative_returns(strategy_returns, benchmark_returns)
+        self.plot_cumulative_returns(strategy_returns, benchmark_returns, data_source=data_source)
         self.plot_drawdown(strategy_returns)
         self.plot_returns_distribution(strategy_returns)
         self.plot_rolling_metrics(strategy_returns)
@@ -599,7 +620,7 @@ def main():
     returns = loader.calculate_returns(prices, 'D')
     
     strategy = TSMOMStrategy()
-    results = strategy.run_strategy(returns)
+    results = strategy.run_strategy(returns, prices)
     
     # Analyze performance
     analyzer = PerformanceAnalyzer()
@@ -613,7 +634,8 @@ def main():
     report = analyzer.generate_comprehensive_report(
         results['returns'], 
         benchmark_returns,
-        align_with_strategy_start=True
+        align_with_strategy_start=True,
+        data_source="Yahoo"
     )
     
     print("Performance analysis completed!")
