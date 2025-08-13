@@ -479,8 +479,7 @@ class TSMOMStrategy:
         Columns:
         - entry_date, exit_date, exit_reason
         - asset, direction (long/short)
-        - amount (notional at entry)
-        - contracts (approximate, notional/price at entry if prices provided)
+        - contracts (number of contracts traded)
         - commission (sum of commissions during the trade segment)
         - pnl (currency PnL over the trade segment)
         """
@@ -549,11 +548,10 @@ class TSMOMStrategy:
                         entry_weight = asset_weights.loc[entry_idx]
                         entry_capital = capital_series.loc[entry_idx]
                         
-                        # Calculate contracts first, then notional_entry
+                        # Calculate contracts and prices
                         contracts = None
                         entry_price = None
                         exit_price = None
-                        notional_entry = float(abs(entry_weight) * entry_capital)  # Default fallback
                         
                         if prices_aligned is not None and asset in prices_aligned.columns:
                             try:
@@ -564,6 +562,7 @@ class TSMOMStrategy:
                                 exit_price = float(prices_aligned.loc[exit_pos, asset])
                             except Exception:
                                 exit_price = None
+                            
                             if entry_price is not None and entry_price > 0:
                                 # Calculate target notional from weight
                                 target_notional = abs(entry_weight) * entry_capital
@@ -574,13 +573,12 @@ class TSMOMStrategy:
                                     qty_whole = 1  # Minimum 1 contract
                                 # Signed contracts for direction
                                 contracts = float(np.sign(entry_sign) * qty_whole)
-                                # Recalculate notional_entry based on actual contracts
-                                notional_entry = float(abs(contracts) * entry_price)
                         
                         # Ensure minimum commission for non-zero positions
                         if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
-                            # Calculate commission based on notional entry value  
-                            base_commission = notional_entry * self.transaction_cost
+                            # Calculate commission based on position weight and capital
+                            position_value = abs(entry_weight) * entry_capital
+                            base_commission = position_value * self.transaction_cost
                             commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
                         exit_reason = 'signal_reversal' if curr_sign == -prev_sign else 'signal_neutral'
                         direction = 'long' if entry_sign > 0 else 'short'
@@ -590,7 +588,6 @@ class TSMOMStrategy:
                             'exit_reason': exit_reason,
                             'asset': asset,
                             'direction': direction,
-                            'amount': notional_entry,
                             'contracts': contracts,
                             'commission': float(commission_sum),
                             'pnl': float(pnl),
@@ -612,11 +609,10 @@ class TSMOMStrategy:
                 entry_weight = asset_weights.loc[entry_idx]
                 entry_capital = capital_series.loc[entry_idx]
                 
-                # Calculate contracts first, then notional_entry
+                # Calculate contracts and prices
                 contracts = None
                 entry_price = None
                 exit_price = None
-                notional_entry = float(abs(entry_weight) * entry_capital)  # Default fallback
                 
                 if prices_aligned is not None and asset in prices_aligned.columns:
                     try:
@@ -627,6 +623,7 @@ class TSMOMStrategy:
                         exit_price = float(prices_aligned.loc[exit_pos, asset])
                     except Exception:
                         exit_price = None
+                    
                     if entry_price is not None and entry_price > 0:
                         # Calculate target notional from weight
                         target_notional = abs(entry_weight) * entry_capital
@@ -636,13 +633,12 @@ class TSMOMStrategy:
                         if qty_whole == 0 and qty > 0:
                             qty_whole = 1  # Minimum 1 contract
                         contracts = float(np.sign(entry_sign) * qty_whole)
-                        # Recalculate notional_entry based on actual contracts
-                        notional_entry = float(abs(contracts) * entry_price)
                 
                 # Ensure minimum commission for non-zero positions
                 if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
-                    # Calculate commission based on notional entry value  
-                    base_commission = notional_entry * self.transaction_cost
+                    # Calculate commission based on position weight and capital
+                    position_value = abs(entry_weight) * entry_capital
+                    base_commission = position_value * self.transaction_cost
                     commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
                 direction = 'long' if entry_sign > 0 else 'short'
                 trade_records.append({
@@ -651,7 +647,6 @@ class TSMOMStrategy:
                     'exit_reason': 'end_of_data',
                     'asset': asset,
                     'direction': direction,
-                    'amount': notional_entry,
                     'contracts': contracts,
                     'commission': float(commission_sum),
                     'pnl': float(pnl),
