@@ -58,31 +58,31 @@ def check_project_structure():
     print("\nChecking project structure...")
     
     required_files = [
-        'config/config.yaml',
-        'src/main.py',
-        'src/data/data_loader.py',
-        'src/strategy/tsmom_strategy.py',
-        'src/analysis/performance_analyzer.py',
-        'src/utils/helpers.py',
-        'requirements.txt',
-        'README.md',
-        'run_backtest.py'
+        '../../config/config.yaml',
+        '../main.py',
+        '../data/data_loader.py',
+        '../strategy/tsmom_strategy.py',
+        '../analysis/performance_analyzer.py',
+        'helpers.py',
+        '../../requirements.txt',
+        '../../README.md',
+        '../../run_backtest.py'
     ]
     
     required_dirs = [
-        'data',
-        'data/raw',
-        'data/processed',
-        'src',
-        'src/data',
-        'src/strategy',
-        'src/analysis',
-        'src/utils',
-        'notebooks',
-        'reports',
-        'tests',
-        'config',
-        'docs'
+        '../../data',
+        '../../data/raw',
+        '../../data/processed',
+        '..',
+        '../data',
+        '../strategy',
+        '../analysis',
+        '.',
+        '../../notebooks',
+        '../../reports',
+        '../../tests',
+        '../../config',
+        '../../docs'
     ]
     
     missing_files = []
@@ -149,22 +149,22 @@ def test_basic_functionality():
     
     try:
         # Test configuration loading
-        from src.utils.helpers import load_config
-        config = load_config('config/config.yaml')
+        from utils.helpers import load_config
+        config = load_config('../../config/config.yaml')
         print("✅ Configuration loading - OK")
         
         # Test data loader initialization
-        from src.data.data_loader import DataLoader
+        from data.data_loader import DataLoader
         loader = DataLoader()
         print("✅ Data loader initialization - OK")
         
         # Test strategy initialization
-        from src.strategy.tsmom_strategy import TSMOMStrategy
+        from strategy.tsmom_strategy import TSMOMStrategy
         strategy = TSMOMStrategy()
         print("✅ Strategy initialization - OK")
         
         # Test analyzer initialization
-        from src.analysis.performance_analyzer import PerformanceAnalyzer
+        from analysis.performance_analyzer import PerformanceAnalyzer
         analyzer = PerformanceAnalyzer()
         print("✅ Performance analyzer initialization - OK")
         

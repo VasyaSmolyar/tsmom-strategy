@@ -9,7 +9,7 @@ import yaml
 import logging
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent))
 
 from main import run_full_backtest, setup_logging
 
@@ -25,7 +25,7 @@ def run_backtest_with_source(data_source: str, benchmark: str) -> dict:
         Dictionary with backtest results
     """
     # Load current config
-    config_path = "config/config.yaml"
+    config_path = "../../config/config.yaml"
     with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
     
@@ -34,7 +34,7 @@ def run_backtest_with_source(data_source: str, benchmark: str) -> dict:
     config['backtest']['benchmark'] = benchmark
     
     # Save temporary config
-    temp_config_path = f"config/config_{data_source.lower()}.yaml"
+    temp_config_path = f"../../config/config_{data_source.lower()}.yaml"
     with open(temp_config_path, 'w') as file:
         yaml.dump(config, file)
     

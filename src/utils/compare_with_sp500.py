@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent))
 
 from data.data_loader import DataLoader
 from strategy.tsmom_strategy import TSMOMStrategy
@@ -172,7 +172,7 @@ def plot_detailed_comparison(strategy_returns, benchmark_returns, analyzer):
     plt.tight_layout()
     
     # Save plot
-    plot_path = Path("reports/plots/strategy_vs_sp500_comparison.png")
+    plot_path = Path("../../reports/plots/strategy_vs_sp500_comparison.png")
     plot_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -245,7 +245,7 @@ def main():
         print("\n" + "="*50)
         print("COMPARISON COMPLETED SUCCESSFULLY!")
         print("="*50)
-        print(f"Reports saved to: reports/")
+        print(f"Reports saved to: ../../reports/")
         print(f"Log file: strategy_comparison.log")
         
     except Exception as e:

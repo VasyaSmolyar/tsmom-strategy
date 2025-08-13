@@ -14,7 +14,7 @@ from datetime import datetime
 import logging
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent))
 
 from main import run_full_backtest, setup_logging
 from analysis.performance_analyzer import PerformanceAnalyzer
@@ -168,7 +168,7 @@ def plot_detailed_comparison(strategy_returns, benchmark_returns, analyzer):
     plt.tight_layout()
     
     # Save plot
-    plot_path = Path("reports/plots") / "strategy_vs_imoex_comparison.png"
+    plot_path = Path("../../reports/plots") / "strategy_vs_imoex_comparison.png"
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -186,7 +186,7 @@ def main():
     try:
         # Run the complete backtest
         results = run_full_backtest(
-            config_path="config/config.yaml",
+            config_path="../../config/config.yaml",
             download_data=True,
             generate_report=True
         )
@@ -215,8 +215,8 @@ def main():
         print("\n" + "=" * 80)
         print("IMOEX COMPARISON COMPLETED SUCCESSFULLY!")
         print("=" * 80)
-        print(f"Reports saved to: reports/")
-        print(f"Detailed comparison plot: reports/plots/strategy_vs_imoex_comparison.png")
+        print(f"Reports saved to: ../../reports/")
+        print(f"Detailed comparison plot: ../../reports/plots/strategy_vs_imoex_comparison.png")
         
     except Exception as e:
         logger.error(f"Error during IMOEX comparison: {e}")
