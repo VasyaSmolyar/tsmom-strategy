@@ -103,7 +103,9 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     # Step 3: Performance Analysis
     if generate_report:
         logger.info("Step 3: Generating performance analysis...")
-        analyzer = PerformanceAnalyzer()
+        # Determine data source suffix for subdirectory
+        data_source_suffix = data_source.lower() if data_source else ""
+        analyzer = PerformanceAnalyzer(data_source_suffix=data_source_suffix)
         
         # Get benchmark data aligned with strategy start
         # Check if we're using MOEX data source

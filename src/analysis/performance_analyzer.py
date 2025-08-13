@@ -25,10 +25,20 @@ logger = logging.getLogger(__name__)
 class PerformanceAnalyzer:
     """Analyzes and visualizes TSMOM strategy performance."""
     
-    def __init__(self, reports_dir: str = "reports"):
-        """Initialize PerformanceAnalyzer."""
+    def __init__(self, reports_dir: str = "reports", data_source_suffix: str = ""):
+        """Initialize PerformanceAnalyzer.
+        
+        Args:
+            reports_dir: Base directory for reports
+            data_source_suffix: Suffix for subdirectory (e.g., "yahoo", "moex")
+        """
         self.reports_dir = Path(reports_dir)
         self.reports_dir.mkdir(exist_ok=True)
+        
+        # Add data source suffix if provided
+        if data_source_suffix:
+            self.reports_dir = self.reports_dir / data_source_suffix.lower()
+            self.reports_dir.mkdir(exist_ok=True)
         
         # Create subdirectories
         (self.reports_dir / "plots").mkdir(exist_ok=True)
