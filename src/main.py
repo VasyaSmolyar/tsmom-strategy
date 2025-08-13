@@ -82,15 +82,20 @@ def run_full_backtest(config_path: str = "config/config.yaml",
             )
         except Exception:
             pass
-        # Determine suffix by data source
-        suffix = 'moex' if data_source.lower() == 'moex' else 'yahoo'
+        # Determine reports directory by data source
+        data_source_suffix = data_source.lower() if data_source else ""
+        if data_source_suffix:
+            trade_reports_dir = f'reports/{data_source_suffix}'
+        else:
+            trade_reports_dir = 'reports'
+        
         trade_log = strategy.generate_trade_log(
             strategy_results['weights'],
             daily_returns,
             strategy_results['returns'],
             prices,
             initial_capital=initial_capital,
-            output_suffix=suffix,
+            reports_dir=trade_reports_dir,
         )
         logger.info(f"Generated trade history with {len(trade_log)} trades")
     except Exception as e:
