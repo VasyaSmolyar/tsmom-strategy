@@ -229,6 +229,66 @@ class TSMOMStrategy:
         
         return position_sizes
     
+    def convert_weights_to_contracts(self, weights: pd.DataFrame, prices: pd.DataFrame, 
+                                   capital: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Convert portfolio weights to whole number of contracts.
+        
+        Args:
+            weights: DataFrame with portfolio weights
+            prices: DataFrame with asset prices
+            capital: Series with total portfolio capital for each date
+        
+        Returns:
+            Tuple of (contract_positions, actual_weights) where:
+            - contract_positions: DataFrame with number of contracts (whole numbers)
+            - actual_weights: DataFrame with actual weights based on whole contracts
+        """
+        logger.info("Converting weights to whole contracts...")
+        
+        # Align data
+        common_dates = weights.index.intersection(prices.index).intersection(capital.index)
+        weights_aligned = weights.loc[common_dates]
+        prices_aligned = prices.loc[common_dates]
+        capital_aligned = capital.loc[common_dates]
+        
+        # Initialize outputs
+        contract_positions = pd.DataFrame(0, index=common_dates, columns=weights.columns)
+        actual_weights = pd.DataFrame(0.0, index=common_dates, columns=weights.columns)
+        
+        for date in common_dates:
+            current_weights = weights_aligned.loc[date]
+            current_prices = prices_aligned.loc[date]
+            current_capital = capital_aligned.loc[date]
+            
+            for asset in weights.columns:
+                if asset in current_prices.index and not pd.isna(current_prices[asset]):
+                    target_weight = current_weights[asset]
+                    asset_price = current_prices[asset]
+                    
+                    if abs(target_weight) > 1e-8 and asset_price > 0:  # Non-zero position
+                        # Calculate target notional value
+                        target_notional = abs(target_weight) * current_capital
+                        
+                        # Calculate number of contracts (rounded to nearest integer)
+                        num_contracts = round(target_notional / asset_price)
+                        
+                        # Ensure minimum of 1 contract for non-zero positions
+                        if num_contracts == 0 and abs(target_weight) > 1e-8:
+                            num_contracts = 1
+                        
+                        # Apply sign from original weight
+                        signed_contracts = num_contracts * np.sign(target_weight)
+                        contract_positions.loc[date, asset] = signed_contracts
+                        
+                        # Calculate actual weight based on whole contracts
+                        actual_notional = abs(signed_contracts) * asset_price
+                        actual_weight = (actual_notional / current_capital) * np.sign(target_weight)
+                        actual_weights.loc[date, asset] = actual_weight
+        
+        logger.info("Conversion to whole contracts completed")
+        return contract_positions, actual_weights
+    
     def generate_portfolio_weights(self, returns: pd.DataFrame, 
                                   prices: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
@@ -267,46 +327,114 @@ class TSMOMStrategy:
         return weights
     
     def calculate_strategy_returns(self, weights: pd.DataFrame, 
-                                 returns: pd.DataFrame) -> pd.Series:
+                                 returns: pd.DataFrame, 
+                                 prices: Optional[pd.DataFrame] = None,
+                                 initial_capital: float = 1_000_000.0) -> pd.Series:
         """
         Calculate strategy returns based on portfolio weights and asset returns.
+        Uses whole contract positions for accurate P&L calculation.
         
         Args:
             weights: DataFrame with portfolio weights
             returns: DataFrame with asset returns
+            prices: DataFrame with asset prices (needed for contract conversion)
+            initial_capital: Starting capital for the strategy
         
         Returns:
             Series with strategy returns
         """
-        logger.info("Calculating strategy returns...")
+        logger.info("Calculating strategy returns with whole contracts...")
         
         # Align weights and returns
         common_dates = weights.index.intersection(returns.index)
         weights_aligned = weights.loc[common_dates]
         returns_aligned = returns.loc[common_dates]
         
-        # Calculate strategy returns
-        strategy_returns = (weights_aligned * returns_aligned).sum(axis=1)
-        
-        # Apply transaction costs (simplified)
-        # Calculate weight changes
-        weight_changes = weights_aligned.diff().abs().sum(axis=1)
-        transaction_costs = weight_changes * self.transaction_cost
-        
-        # Net returns after transaction costs
-        net_returns = strategy_returns - transaction_costs
+        if prices is not None:
+            # Use whole contract approach
+            # Initialize capital series
+            capital_series = pd.Series(initial_capital, index=common_dates)
+            capital_series.iloc[0] = initial_capital
+            
+            # Convert weights to contracts
+            contract_positions, actual_weights = self.convert_weights_to_contracts(
+                weights_aligned, prices.loc[common_dates], capital_series
+            )
+            
+            # Calculate returns based on actual weights from whole contracts
+            strategy_returns = (actual_weights * returns_aligned).sum(axis=1)
+            
+            # Calculate transaction costs based on contract changes
+            contract_changes = contract_positions.diff().abs().fillna(contract_positions.abs())
+            
+            # Transaction costs based on turnover in currency terms
+            transaction_costs = pd.Series(0.0, index=common_dates)
+            
+            for date in common_dates:
+                if date in prices.index:
+                    current_prices = prices.loc[date]
+                    current_changes = contract_changes.loc[date]
+                    
+                    # Calculate turnover in currency for each asset
+                    for asset in contract_positions.columns:
+                        if (asset in current_prices.index and 
+                            not pd.isna(current_prices[asset]) and 
+                            not pd.isna(current_changes[asset])):
+                            
+                            asset_turnover = abs(current_changes[asset]) * current_prices[asset]
+                            asset_commission = asset_turnover * self.transaction_cost
+                            
+                            # Ensure minimum commission for any trade
+                            if asset_commission > 0:
+                                asset_commission = max(asset_commission, 0.01)  # Minimum 1 cent
+                            
+                            transaction_costs[date] += asset_commission
+            
+            # Convert transaction costs to return terms
+            transaction_cost_returns = transaction_costs / capital_series
+            
+            # Update capital series iteratively
+            for i, date in enumerate(common_dates):
+                if i > 0:
+                    prev_capital = capital_series.iloc[i-1]
+                    gross_return = strategy_returns.iloc[i]
+                    commission_return = transaction_cost_returns.iloc[i]
+                    
+                    # Net return after commission
+                    net_return = gross_return - commission_return
+                    capital_series.iloc[i] = prev_capital * (1 + net_return)
+            
+            # Calculate final net returns
+            net_returns = strategy_returns - transaction_cost_returns
+            
+        else:
+            # Fallback to original approach if no prices available
+            logger.warning("No prices provided for contract calculation, using weight-based approach")
+            strategy_returns = (weights_aligned * returns_aligned).sum(axis=1)
+            
+            # Apply transaction costs (simplified)
+            weight_changes = weights_aligned.diff().abs().sum(axis=1)
+            transaction_costs = weight_changes * self.transaction_cost
+            
+            # Ensure minimum commission for any turnover
+            transaction_costs = transaction_costs.where(transaction_costs == 0, 
+                                                      transaction_costs.clip(lower=0.01/initial_capital))
+            
+            net_returns = strategy_returns - transaction_costs
         
         logger.info(f"Calculated strategy returns for {len(net_returns)} periods")
         
         return net_returns
     
-    def run_strategy(self, returns: pd.DataFrame, prices: Optional[pd.DataFrame] = None) -> Dict:
+    def run_strategy(self, returns: pd.DataFrame, prices: Optional[pd.DataFrame] = None,
+                   initial_capital: float = 1_000_000.0) -> Dict:
         """
         Run the complete TSMOM strategy.
         
         Args:
             returns: DataFrame with asset returns
-            prices: DataFrame with asset prices (needed for stop loss)
+            prices: DataFrame with asset prices (needed for stop loss and contract calculation)
+            initial_capital: Starting capital for the strategy
         
         Returns:
             Dictionary with strategy results
@@ -316,8 +444,8 @@ class TSMOMStrategy:
         # Generate portfolio weights
         weights = self.generate_portfolio_weights(returns, prices)
         
-        # Calculate strategy returns
-        strategy_returns = self.calculate_strategy_returns(weights, returns)
+        # Calculate strategy returns with whole contract logic
+        strategy_returns = self.calculate_strategy_returns(weights, returns, prices, initial_capital)
         
         # Calculate performance metrics
         performance_metrics = self.calculate_performance_metrics(strategy_returns)
@@ -418,12 +546,14 @@ class TSMOMStrategy:
                         pnl = daily_asset_pnl.loc[segment.index, asset].sum()
                         commission_sum = daily_commission_by_asset.loc[segment.index, asset].sum()
                         entry_weight = asset_weights.loc[entry_idx]
-                        # Ensure minimum commission for non-zero positions (round up to nearest cent)
-                        if commission_sum == 0.0 and len(segment) > 0:
-                            commission_sum = math.ceil(abs(entry_weight) * capital_series.loc[entry_idx] * self.transaction_cost * 100) / 100
-                        exit_reason = 'signal_reversal' if curr_sign == -prev_sign else 'signal_neutral'
                         entry_capital = capital_series.loc[entry_idx]
                         notional_entry = float(abs(entry_weight) * entry_capital)
+                        # Ensure minimum commission for non-zero positions
+                        if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
+                            # Calculate commission based on notional entry value  
+                            base_commission = notional_entry * self.transaction_cost
+                            commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
+                        exit_reason = 'signal_reversal' if curr_sign == -prev_sign else 'signal_neutral'
                         direction = 'long' if entry_sign > 0 else 'short'
                         contracts = None
                         entry_price = None
@@ -439,12 +569,12 @@ class TSMOMStrategy:
                                 exit_price = None
                             if entry_price is not None and entry_price > 0:
                                 qty = notional_entry / entry_price
-                                # Round to nearest even number of contracts
-                                qty_even = int(qty // 2) * 2
-                                if qty_even == 0 and qty > 0:
-                                    qty_even = 2  # Minimum 2 contracts
+                                # Round to nearest whole number of contracts
+                                qty_whole = round(qty)
+                                if qty_whole == 0 and qty > 0:
+                                    qty_whole = 1  # Minimum 1 contract
                                 # Signed contracts for direction
-                                contracts = float(np.sign(entry_sign) * qty_even)
+                                contracts = float(np.sign(entry_sign) * qty_whole)
                         trade_records.append({
                             'entry_date': entry_idx,
                             'exit_date': exit_pos,
@@ -471,11 +601,13 @@ class TSMOMStrategy:
                 pnl = daily_asset_pnl.loc[segment.index, asset].sum()
                 commission_sum = daily_commission_by_asset.loc[segment.index, asset].sum()
                 entry_weight = asset_weights.loc[entry_idx]
-                # Ensure minimum commission for non-zero positions (round up to nearest cent)
-                if commission_sum == 0.0 and len(segment) > 0:
-                    commission_sum = math.ceil(abs(entry_weight) * capital_series.loc[entry_idx] * self.transaction_cost * 100) / 100
                 entry_capital = capital_series.loc[entry_idx]
                 notional_entry = float(abs(entry_weight) * entry_capital)
+                # Ensure minimum commission for non-zero positions
+                if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
+                    # Calculate commission based on notional entry value  
+                    base_commission = notional_entry * self.transaction_cost
+                    commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
                 direction = 'long' if entry_sign > 0 else 'short'
                 contracts = None
                 entry_price = None
@@ -491,11 +623,11 @@ class TSMOMStrategy:
                         exit_price = None
                     if entry_price is not None and entry_price > 0:
                         qty = notional_entry / entry_price
-                        # Round to nearest even number of contracts
-                        qty_even = int(qty // 2) * 2
-                        if qty_even == 0 and qty > 0:
-                            qty_even = 2  # Minimum 2 contracts
-                        contracts = float(np.sign(entry_sign) * qty_even)
+                        # Round to nearest whole number of contracts
+                        qty_whole = round(qty)
+                        if qty_whole == 0 and qty > 0:
+                            qty_whole = 1  # Minimum 1 contract
+                        contracts = float(np.sign(entry_sign) * qty_whole)
                 trade_records.append({
                     'entry_date': entry_idx,
                     'exit_date': exit_pos,
@@ -593,7 +725,7 @@ def main():
     
     # Run strategy
     strategy = TSMOMStrategy()
-    results = strategy.run_strategy(returns)
+    results = strategy.run_strategy(returns, prices)
     
     # Print results
     print("\nTSMOM Strategy Results:")

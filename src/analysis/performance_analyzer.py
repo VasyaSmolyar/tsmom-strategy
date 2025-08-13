@@ -610,7 +610,7 @@ def main():
     returns = loader.calculate_returns(prices, 'D')
     
     strategy = TSMOMStrategy()
-    results = strategy.run_strategy(returns)
+    results = strategy.run_strategy(returns, prices)
     
     # Analyze performance
     analyzer = PerformanceAnalyzer()

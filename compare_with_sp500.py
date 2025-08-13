@@ -202,7 +202,7 @@ def main():
         # Step 2: Run strategy
         logger.info("Running TSMOM strategy...")
         strategy = TSMOMStrategy()
-        strategy_results = strategy.run_strategy(returns)
+        strategy_results = strategy.run_strategy(returns, prices)
         
         logger.info(f"Strategy executed: {len(strategy_results['returns'])} periods")
         

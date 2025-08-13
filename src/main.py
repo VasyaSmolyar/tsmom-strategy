@@ -206,7 +206,7 @@ def run_sensitivity_analysis(config_path: str = "config/config.yaml", data_sourc
         strategy.lookback_period = lookback
         
         # Run strategy
-        results = strategy.run_strategy(returns)
+        results = strategy.run_strategy(returns, prices)
         
         # Calculate basic metrics
         metrics = strategy.calculate_performance_metrics(results['returns'])
