@@ -1,6 +1,6 @@
 # TSMOM Strategy Performance Report
 
-Generated on: 2025-08-12 16:16:34
+Generated on: 2025-08-13 13:46:02
 
 ## Executive Summary
 

@@ -5,6 +5,7 @@ Based on Moskowitz, Ooi, and Pedersen (2012).
 
 import pandas as pd
 import numpy as np
+import math
 from typing import Dict, List, Tuple, Optional
 import logging
 from pathlib import Path
@@ -374,10 +375,23 @@ class TSMOMStrategy:
         
         # Daily per-asset commissions in currency (based on turnover)
         daily_turnover_by_asset = weights_aligned.diff().abs().fillna(0.0)
+        
+        # For first day, use absolute weights as turnover (initial position opening)
+        first_day_mask = daily_turnover_by_asset.index == daily_turnover_by_asset.index[0]
+        daily_turnover_by_asset.loc[first_day_mask] = weights_aligned.abs().loc[first_day_mask]
+        
         daily_commission_by_asset = daily_turnover_by_asset.multiply(
             self.transaction_cost, axis=0
         ).multiply(capital_series, axis=0)
         daily_commission_by_asset = daily_commission_by_asset.fillna(0.0)
+        
+        # Ensure commission is never zero when there's turnover - round up to nearest cent
+        commission_mask = daily_commission_by_asset > 0
+        daily_commission_by_asset = daily_commission_by_asset.where(
+            ~commission_mask, 
+            daily_commission_by_asset.where(~commission_mask, 
+                daily_commission_by_asset.applymap(lambda x: math.ceil(x * 100) / 100 if x > 0 else x))
+        )
         
         trade_records: List[Dict] = []
         
@@ -404,6 +418,9 @@ class TSMOMStrategy:
                         pnl = daily_asset_pnl.loc[segment.index, asset].sum()
                         commission_sum = daily_commission_by_asset.loc[segment.index, asset].sum()
                         entry_weight = asset_weights.loc[entry_idx]
+                        # Ensure minimum commission for non-zero positions (round up to nearest cent)
+                        if commission_sum == 0.0 and len(segment) > 0:
+                            commission_sum = math.ceil(abs(entry_weight) * capital_series.loc[entry_idx] * self.transaction_cost * 100) / 100
                         exit_reason = 'signal_reversal' if curr_sign == -prev_sign else 'signal_neutral'
                         entry_capital = capital_series.loc[entry_idx]
                         notional_entry = float(abs(entry_weight) * entry_capital)
@@ -422,8 +439,12 @@ class TSMOMStrategy:
                                 exit_price = None
                             if entry_price is not None and entry_price > 0:
                                 qty = notional_entry / entry_price
+                                # Round to nearest even number of contracts
+                                qty_even = int(qty // 2) * 2
+                                if qty_even == 0 and qty > 0:
+                                    qty_even = 2  # Minimum 2 contracts
                                 # Signed contracts for direction
-                                contracts = float(np.sign(entry_sign) * qty)
+                                contracts = float(np.sign(entry_sign) * qty_even)
                         trade_records.append({
                             'entry_date': entry_idx,
                             'exit_date': exit_pos,
@@ -450,6 +471,9 @@ class TSMOMStrategy:
                 pnl = daily_asset_pnl.loc[segment.index, asset].sum()
                 commission_sum = daily_commission_by_asset.loc[segment.index, asset].sum()
                 entry_weight = asset_weights.loc[entry_idx]
+                # Ensure minimum commission for non-zero positions (round up to nearest cent)
+                if commission_sum == 0.0 and len(segment) > 0:
+                    commission_sum = math.ceil(abs(entry_weight) * capital_series.loc[entry_idx] * self.transaction_cost * 100) / 100
                 entry_capital = capital_series.loc[entry_idx]
                 notional_entry = float(abs(entry_weight) * entry_capital)
                 direction = 'long' if entry_sign > 0 else 'short'
@@ -467,7 +491,11 @@ class TSMOMStrategy:
                         exit_price = None
                     if entry_price is not None and entry_price > 0:
                         qty = notional_entry / entry_price
-                        contracts = float(np.sign(entry_sign) * qty)
+                        # Round to nearest even number of contracts
+                        qty_even = int(qty // 2) * 2
+                        if qty_even == 0 and qty > 0:
+                            qty_even = 2  # Minimum 2 contracts
+                        contracts = float(np.sign(entry_sign) * qty_even)
                 trade_records.append({
                     'entry_date': entry_idx,
                     'exit_date': exit_pos,
