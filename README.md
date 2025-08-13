@@ -15,7 +15,7 @@ This project implements and backtests a **Time Series Momentum (TSMOM)** strateg
 
 ### Prerequisites
 - Python 3.8+
-- Virtual environment recommended [[memory:6097092]]
+- Virtual environment recommended
 
 ### Installation
 ```bash
