@@ -547,17 +547,13 @@ class TSMOMStrategy:
                         commission_sum = daily_commission_by_asset.loc[segment.index, asset].sum()
                         entry_weight = asset_weights.loc[entry_idx]
                         entry_capital = capital_series.loc[entry_idx]
-                        notional_entry = float(abs(entry_weight) * entry_capital)
-                        # Ensure minimum commission for non-zero positions
-                        if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
-                            # Calculate commission based on notional entry value  
-                            base_commission = notional_entry * self.transaction_cost
-                            commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
-                        exit_reason = 'signal_reversal' if curr_sign == -prev_sign else 'signal_neutral'
-                        direction = 'long' if entry_sign > 0 else 'short'
+                        
+                        # Calculate contracts first, then notional_entry
                         contracts = None
                         entry_price = None
                         exit_price = None
+                        notional_entry = float(abs(entry_weight) * entry_capital)  # Default fallback
+                        
                         if prices_aligned is not None and asset in prices_aligned.columns:
                             try:
                                 entry_price = float(prices_aligned.loc[entry_idx, asset])
@@ -568,13 +564,25 @@ class TSMOMStrategy:
                             except Exception:
                                 exit_price = None
                             if entry_price is not None and entry_price > 0:
-                                qty = notional_entry / entry_price
+                                # Calculate target notional from weight
+                                target_notional = abs(entry_weight) * entry_capital
+                                qty = target_notional / entry_price
                                 # Round to nearest whole number of contracts
                                 qty_whole = round(qty)
                                 if qty_whole == 0 and qty > 0:
                                     qty_whole = 1  # Minimum 1 contract
                                 # Signed contracts for direction
                                 contracts = float(np.sign(entry_sign) * qty_whole)
+                                # Recalculate notional_entry based on actual contracts
+                                notional_entry = float(abs(contracts) * entry_price)
+                        
+                        # Ensure minimum commission for non-zero positions
+                        if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
+                            # Calculate commission based on notional entry value  
+                            base_commission = notional_entry * self.transaction_cost
+                            commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
+                        exit_reason = 'signal_reversal' if curr_sign == -prev_sign else 'signal_neutral'
+                        direction = 'long' if entry_sign > 0 else 'short'
                         trade_records.append({
                             'entry_date': entry_idx,
                             'exit_date': exit_pos,
@@ -602,16 +610,13 @@ class TSMOMStrategy:
                 commission_sum = daily_commission_by_asset.loc[segment.index, asset].sum()
                 entry_weight = asset_weights.loc[entry_idx]
                 entry_capital = capital_series.loc[entry_idx]
-                notional_entry = float(abs(entry_weight) * entry_capital)
-                # Ensure minimum commission for non-zero positions
-                if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
-                    # Calculate commission based on notional entry value  
-                    base_commission = notional_entry * self.transaction_cost
-                    commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
-                direction = 'long' if entry_sign > 0 else 'short'
+                
+                # Calculate contracts first, then notional_entry
                 contracts = None
                 entry_price = None
                 exit_price = None
+                notional_entry = float(abs(entry_weight) * entry_capital)  # Default fallback
+                
                 if prices_aligned is not None and asset in prices_aligned.columns:
                     try:
                         entry_price = float(prices_aligned.loc[entry_idx, asset])
@@ -622,12 +627,23 @@ class TSMOMStrategy:
                     except Exception:
                         exit_price = None
                     if entry_price is not None and entry_price > 0:
-                        qty = notional_entry / entry_price
+                        # Calculate target notional from weight
+                        target_notional = abs(entry_weight) * entry_capital
+                        qty = target_notional / entry_price
                         # Round to nearest whole number of contracts
                         qty_whole = round(qty)
                         if qty_whole == 0 and qty > 0:
                             qty_whole = 1  # Minimum 1 contract
                         contracts = float(np.sign(entry_sign) * qty_whole)
+                        # Recalculate notional_entry based on actual contracts
+                        notional_entry = float(abs(contracts) * entry_price)
+                
+                # Ensure minimum commission for non-zero positions
+                if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
+                    # Calculate commission based on notional entry value  
+                    base_commission = notional_entry * self.transaction_cost
+                    commission_sum = max(base_commission, 0.01)  # Minimum 1 cent per trade
+                direction = 'long' if entry_sign > 0 else 'short'
                 trade_records.append({
                     'entry_date': entry_idx,
                     'exit_date': exit_pos,
