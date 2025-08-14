@@ -6,6 +6,7 @@ strategy:
   holding_period: 1    # months
   target_volatility: 0.40  # 40% annual volatility
   transaction_cost: 0.001  # 0.1% per trade
+  contract_integrity: true  # true for whole contracts, false for fractional contracts (crypto)
 
 # Data Parameters
 data:

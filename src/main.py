@@ -71,6 +71,12 @@ def run_full_backtest(config_path: str = "config/config.yaml",
     # Step 2: Strategy Execution
     logger.info("Step 2: Executing TSMOM strategy...")
     strategy = TSMOMStrategy(config_path)
+    
+    # Override contract integrity for crypto data source
+    if data_source == "YahooCrypto":
+        strategy.contract_integrity = False
+        logger.info("Contract integrity set to False for crypto data source (fractional contracts enabled)")
+    
     strategy_results = strategy.run_strategy(daily_returns, prices)
     
     # Generate and save trade history CSV
@@ -113,9 +119,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         analyzer = PerformanceAnalyzer(data_source_suffix=data_source_suffix)
         
         # Get benchmark data aligned with strategy start
-        # Check if we're using MOEX data source
-        benchmark_symbol = '^GSPC'  # Default to S&P 500
-        
+        # Determine benchmark symbol based on data source
         if data_source == 'MOEX':
             # For MOEX data, load IMOEX benchmark from the same data loader
             logger.info("Loading IMOEX benchmark data from MOEX loader...")
@@ -130,12 +134,18 @@ def run_full_backtest(config_path: str = "config/config.yaml",
             else:
                 logger.warning("No IMOEX data available, using default benchmark")
                 benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
-                    strategy_results['returns']
+                    strategy_results['returns'], symbol='^GSPC'
                 )
-        else:
-            # Use default benchmark (S&P 500)
+        elif data_source == 'YahooCrypto':
+            # For crypto data, use BTC as benchmark
+            logger.info("Using BTC as benchmark for crypto data source...")
             benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
-                strategy_results['returns']
+                strategy_results['returns'], symbol='BTC-USD'
+            )
+        else:
+            # Default benchmark (S&P 500) for futures and other sources
+            benchmark_returns = analyzer.generate_benchmark_data_from_strategy_start(
+                strategy_results['returns'], symbol='^GSPC'
             )
         
         # Generate comprehensive report with alignment

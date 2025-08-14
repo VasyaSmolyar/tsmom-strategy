@@ -36,13 +36,14 @@ class TSMOMStrategy:
         self.holding_period = self.strategy_config['holding_period']    # months
         self.target_volatility = self.strategy_config['target_volatility']
         self.transaction_cost = self.strategy_config['transaction_cost']
+        self.contract_integrity = self.strategy_config.get('contract_integrity', True)  # Default to whole contracts
         
         # Risk management parameters
         self.volatility_lookback = self.risk_config['volatility_lookback']  # months
         self.max_position_size = self.risk_config['max_position_size']
         self.stop_loss = self.risk_config.get('stop_loss', 0.05)  # Stop loss threshold
         
-        logger.info(f"Initialized TSMOM strategy with lookback={self.lookback_period} months, stop_loss={self.stop_loss}")
+        logger.info(f"Initialized TSMOM strategy with lookback={self.lookback_period} months, stop_loss={self.stop_loss}, contract_integrity={self.contract_integrity}")
     
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file."""
@@ -232,7 +233,7 @@ class TSMOMStrategy:
     def convert_weights_to_contracts(self, weights: pd.DataFrame, prices: pd.DataFrame, 
                                    capital: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Convert portfolio weights to whole number of contracts.
+        Convert portfolio weights to contracts (whole or fractional based on contract_integrity flag).
         
         Args:
             weights: DataFrame with portfolio weights
@@ -241,10 +242,10 @@ class TSMOMStrategy:
         
         Returns:
             Tuple of (contract_positions, actual_weights) where:
-            - contract_positions: DataFrame with number of contracts (whole numbers)
-            - actual_weights: DataFrame with actual weights based on whole contracts
+            - contract_positions: DataFrame with number of contracts (whole or fractional)
+            - actual_weights: DataFrame with actual weights based on contracts
         """
-        logger.info("Converting weights to whole contracts...")
+        logger.info(f"Converting weights to {'whole' if self.contract_integrity else 'fractional'} contracts...")
         
         # Align data
         common_dates = weights.index.intersection(prices.index).intersection(capital.index)
@@ -270,23 +271,34 @@ class TSMOMStrategy:
                         # Calculate target notional value
                         target_notional = abs(target_weight) * current_capital
                         
-                        # Calculate number of contracts (rounded to nearest integer)
-                        num_contracts = round(target_notional / asset_price)
+                        # Calculate number of contracts
+                        exact_contracts = target_notional / asset_price
                         
-                        # Ensure minimum of 1 contract for non-zero positions
-                        if num_contracts == 0 and abs(target_weight) > 1e-8:
-                            num_contracts = 1
-                        
-                        # Apply sign from original weight
-                        signed_contracts = num_contracts * np.sign(target_weight)
-                        contract_positions.loc[date, asset] = signed_contracts
-                        
-                        # Calculate actual weight based on whole contracts
-                        actual_notional = abs(signed_contracts) * asset_price
-                        actual_weight = (actual_notional / current_capital) * np.sign(target_weight)
-                        actual_weights.loc[date, asset] = actual_weight
+                        if self.contract_integrity:
+                            # Round to nearest integer for whole contracts
+                            num_contracts = round(exact_contracts)
+                            
+                            # Ensure minimum of 1 contract for non-zero positions
+                            if num_contracts == 0 and abs(target_weight) > 1e-8:
+                                num_contracts = 1
+                            
+                            # Apply sign from original weight
+                            signed_contracts = num_contracts * np.sign(target_weight)
+                            contract_positions.loc[date, asset] = signed_contracts
+                            
+                            # Calculate actual weight based on whole contracts
+                            actual_notional = abs(signed_contracts) * asset_price
+                            actual_weight = (actual_notional / current_capital) * np.sign(target_weight)
+                            actual_weights.loc[date, asset] = actual_weight
+                        else:
+                            # Use fractional contracts (for crypto)
+                            signed_contracts = exact_contracts * np.sign(target_weight)
+                            contract_positions.loc[date, asset] = signed_contracts
+                            
+                            # Actual weight is the same as target weight with fractional contracts
+                            actual_weights.loc[date, asset] = target_weight
         
-        logger.info("Conversion to whole contracts completed")
+        logger.info(f"Conversion to {'whole' if self.contract_integrity else 'fractional'} contracts completed")
         return contract_positions, actual_weights
     
     def generate_portfolio_weights(self, returns: pd.DataFrame, 
@@ -567,12 +579,17 @@ class TSMOMStrategy:
                                 # Calculate target notional from weight
                                 target_notional = abs(entry_weight) * entry_capital
                                 qty = target_notional / entry_price
-                                # Round to nearest whole number of contracts
-                                qty_whole = round(qty)
-                                if qty_whole == 0 and qty > 0:
-                                    qty_whole = 1  # Minimum 1 contract
-                                # Signed contracts for direction
-                                contracts = float(np.sign(entry_sign) * qty_whole)
+                                
+                                if self.contract_integrity:
+                                    # Round to nearest whole number of contracts
+                                    qty_whole = round(qty)
+                                    if qty_whole == 0 and qty > 0:
+                                        qty_whole = 1  # Minimum 1 contract
+                                    # Signed contracts for direction
+                                    contracts = float(np.sign(entry_sign) * qty_whole)
+                                else:
+                                    # Use fractional contracts (for crypto)
+                                    contracts = float(np.sign(entry_sign) * qty)
                         
                         # Ensure minimum commission for non-zero positions
                         if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
@@ -628,11 +645,16 @@ class TSMOMStrategy:
                         # Calculate target notional from weight
                         target_notional = abs(entry_weight) * entry_capital
                         qty = target_notional / entry_price
-                        # Round to nearest whole number of contracts
-                        qty_whole = round(qty)
-                        if qty_whole == 0 and qty > 0:
-                            qty_whole = 1  # Minimum 1 contract
-                        contracts = float(np.sign(entry_sign) * qty_whole)
+                        
+                        if self.contract_integrity:
+                            # Round to nearest whole number of contracts
+                            qty_whole = round(qty)
+                            if qty_whole == 0 and qty > 0:
+                                qty_whole = 1  # Minimum 1 contract
+                            contracts = float(np.sign(entry_sign) * qty_whole)
+                        else:
+                            # Use fractional contracts (for crypto)
+                            contracts = float(np.sign(entry_sign) * qty)
                 
                 # Ensure minimum commission for non-zero positions
                 if commission_sum <= 0.0 and len(segment) > 0 and abs(entry_weight) > 1e-8:
