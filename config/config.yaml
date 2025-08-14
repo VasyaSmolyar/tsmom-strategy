@@ -11,6 +11,7 @@ strategy:
 data:
   start_date: "2000-01-01"
   end_date: "2023-12-31"
+  crypto_start_date: "2018-01-01"  # Crypto data starts from 2018
   frequency: "D"  # Daily data
   min_assets: 20
 
@@ -63,7 +64,18 @@ assets:
     - "KC=F"   # Coffee Futures
     - "CT=F"   # Cotton Futures
     - "BR.ME"  # Brent Oil (MOEX)
-    - "GOLD.ME" # Gold (MOEX)
+  
+  cryptocurrencies:
+    - "BTC-USD"  # Bitcoin (BTC) - ~$2.36 trillion market cap
+    - "ETH-USD"  # Ethereum (ETH) - ~$519 billion market cap
+    - "BNB-USD"  # Binance Coin (BNB) - ~$111.98 billion market cap
+    - "XRP-USD"  # XRP (XRP) - ~$185.94 billion market cap
+    - "SOL-USD"  # Solana (SOL) - ~$94.49 billion market cap
+    - "DOGE-USD" # Dogecoin (DOGE) - ~$34 billion market cap
+    - "ADA-USD"  # Cardano (ADA) - ~$27.5 billion market cap
+    - "AVAX-USD" # Avalanche (AVAX) - ~$9.67 billion market cap
+    - "SHIB-USD" # Shiba Inu (SHIB) - ~$7.6 billion market cap
+    - "DOT-USD"  # Polkadot (DOT) - ~$6.2 billion market cap
 
 # Backtest Parameters
 backtest:

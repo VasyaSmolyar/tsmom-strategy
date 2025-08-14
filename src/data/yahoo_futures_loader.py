@@ -36,7 +36,7 @@ class YahooFuturesLoader(DataLoader):
             DataFrame with OHLCV data for all symbols
         """
         if symbols is None:
-            symbols = self.get_yahoo_asset_universe()
+            symbols = self.get_yahoo_futures_asset_universe()
         
         if start_date is None:
             start_date = self.config['data']['start_date']
@@ -82,20 +82,20 @@ class YahooFuturesLoader(DataLoader):
         else:
             raise ValueError("No data was successfully downloaded")
     
-    def get_yahoo_asset_universe(self) -> List[str]:
-        """Get the asset universe suitable for Yahoo Finance (exclude Russian assets)."""
+    def get_yahoo_futures_asset_universe(self) -> List[str]:
+        """Get the asset universe suitable for Yahoo Finance futures (exclude Russian and crypto assets)."""
         assets = []
         asset_config = self.config['assets']
         
-        # Only include non-Russian assets for Yahoo Finance
+        # Only include non-Russian, non-crypto assets for Yahoo Futures loader
         for category_name, category in asset_config.items():
             if isinstance(category, list):
-                # Skip Russian assets for Yahoo loader
-                if category_name in ['russian_equities']:
+                # Skip Russian assets and crypto for Yahoo Futures loader
+                if category_name in ['russian_equities', 'cryptocurrencies']:
                     continue
                 # Filter out MOEX assets from other categories
                 filtered_assets = [asset for asset in category if not asset.endswith('.ME')]
                 assets.extend(filtered_assets)
         
-        logger.info(f"Yahoo asset universe: {len(assets)} assets - {assets}")
+        logger.info(f"Yahoo Futures asset universe: {len(assets)} assets - {assets}")
         return assets 

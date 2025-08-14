@@ -33,7 +33,7 @@ def setup_logging(log_level: str = "INFO") -> None:
 def run_full_backtest(config_path: str = "config/config.yaml",
                      download_data: bool = True,
                      generate_report: bool = True,
-                     data_source: str = "Yahoo") -> dict:
+                     data_source: str = "YahooFutures") -> dict:
     """
     Run the complete TSMOM backtest.
     
@@ -41,7 +41,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         config_path: Path to configuration file
         download_data: Whether to download fresh data
         generate_report: Whether to generate performance report
-        data_source: Data source to use ("Yahoo" or "MOEX")
+        data_source: Data source to use ("YahooFutures", "YahooCrypto" or "MOEX")
     
     Returns:
         Dictionary with all results

@@ -6,27 +6,30 @@ Factory functions and main execution logic.
 import logging
 import yaml
 from .base_loader import DataLoader
-from .yahoo_loader import YahooLoader
+from .yahoo_futures_loader import YahooFuturesLoader
+from .yahoo_crypto_loader import YahooCryptoLoader
 from .moex_loader import MoexLoader
 
 
-def create_data_loader(config_path: str = "config/config.yaml", data_source: str = "Yahoo") -> DataLoader:
+def create_data_loader(config_path: str = "config/config.yaml", data_source: str = "YahooFutures") -> DataLoader:
     """
     Factory function to create appropriate data loader based on data source parameter.
     
     Args:
         config_path: Path to configuration file
-        data_source: Data source to use ("Yahoo" or "MOEX")
+        data_source: Data source to use ("YahooFutures", "YahooCrypto" or "MOEX")
     
     Returns:
         Appropriate DataLoader instance
     """
-    if data_source == 'Yahoo':
-        return YahooLoader(config_path)
+    if data_source == 'YahooFutures':
+        return YahooFuturesLoader(config_path)
+    elif data_source == 'YahooCrypto':
+        return YahooCryptoLoader(config_path)
     elif data_source == 'MOEX':
         return MoexLoader(config_path)
     else:
-        raise ValueError(f"Unsupported data source: {data_source}")
+        raise ValueError(f"Unknown data source: {data_source}. Supported sources: YahooFutures, YahooCrypto, MOEX")
 
 
 def main():

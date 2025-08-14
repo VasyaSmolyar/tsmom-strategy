@@ -2,12 +2,13 @@
 """
 Unified Backtest Script for TSMOM Strategy.
 
-Runs backtests for Yahoo (US) and/or MOEX (Russian) markets based on command line arguments.
+Runs backtests for YahooFutures (US), YahooCrypto and/or MOEX (Russian) markets based on command line arguments.
 
 Usage:
-    python run_backtest.py                    # Run both Yahoo and MOEX backtests
-    python run_backtest.py --source yahoo     # Run only Yahoo backtest
-    python run_backtest.py --source moex      # Run only MOEX backtest
+    python run_backtest.py                               # Run all backtests
+    python run_backtest.py --source yahoo_futures       # Run only Yahoo Futures backtest
+    python run_backtest.py --source yahoo_crypto        # Run only Yahoo Crypto backtest
+    python run_backtest.py --source moex                # Run only MOEX backtest
 """
 
 import sys
@@ -27,7 +28,7 @@ def run_market_backtest(data_source: str, config_path: str = "config/config.yaml
     Run backtest for a specific market.
     
     Args:
-        data_source: "Yahoo" or "MOEX"
+        data_source: "YahooFutures", "YahooCrypto" or "MOEX"
         config_path: Path to configuration file
     
     Returns:
@@ -35,8 +36,15 @@ def run_market_backtest(data_source: str, config_path: str = "config/config.yaml
     """
     logger = logging.getLogger(__name__)
     
-    market_name = "US" if data_source == "Yahoo" else "Russian"
-    benchmark_name = "S&P500" if data_source == "Yahoo" else "IMOEX"
+    if data_source == "YahooFutures":
+        market_name = "US Futures"
+        benchmark_name = "S&P500"
+    elif data_source == "YahooCrypto":
+        market_name = "Crypto"
+        benchmark_name = "BTC"
+    else:  # MOEX
+        market_name = "Russian"
+        benchmark_name = "IMOEX"
     
     print(f"\n{'=' * 60}")
     print(f"Running {market_name} Market Backtest")
@@ -104,25 +112,40 @@ def run_market_backtest(data_source: str, config_path: str = "config/config.yaml
         return None
 
 
-def run_both_backtests(config_path: str = "config/config.yaml") -> dict:
-    """Run backtests for both markets."""
+def run_all_backtests(config_path: str = "config/config.yaml") -> dict:
+    """Run backtests for all markets."""
     logger = logging.getLogger(__name__)
     overall_start_time = time.time()
     all_results = {}
     
-    print("Running backtests for both markets:")
-    print("1. US Market (Yahoo Finance data, S&P500 benchmark)")
-    print("2. Russian Market (MOEX data, IMOEX benchmark)")
-    print("Results will be saved to reports/yahoo/ and reports/moex/")
+    print("Running backtests for all markets:")
+    print("1. US Futures Market (Yahoo Finance futures data, S&P500 benchmark)")
+    print("2. Crypto Market (Yahoo Finance crypto data, BTC benchmark)")
+    print("3. Russian Market (MOEX data, IMOEX benchmark)")
+    print("Results will be saved to reports/yahoo_futures/, reports/yahoo_crypto/ and reports/moex/")
     
-    # Run Yahoo (US) backtest
-    logger.info("Starting US Market (Yahoo) backtest...")
-    yahoo_results = run_market_backtest("Yahoo", config_path)
-    if yahoo_results:
-        all_results['yahoo'] = yahoo_results
-        logger.info("US Market backtest completed successfully")
+    # Run Yahoo Futures (US) backtest
+    logger.info("Starting US Futures Market (YahooFutures) backtest...")
+    yahoo_futures_results = run_market_backtest("YahooFutures", config_path)
+    if yahoo_futures_results:
+        all_results['yahoo_futures'] = yahoo_futures_results
+        logger.info("US Futures Market backtest completed successfully")
     else:
-        logger.error("US Market backtest failed")
+        logger.error("US Futures Market backtest failed")
+    
+    print(f"\n{'=' * 60}")
+    print("Waiting 2 seconds before starting crypto market backtest...")
+    print(f"{'=' * 60}")
+    time.sleep(2)
+    
+    # Run Yahoo Crypto backtest
+    logger.info("Starting Crypto Market (YahooCrypto) backtest...")
+    yahoo_crypto_results = run_market_backtest("YahooCrypto", config_path)
+    if yahoo_crypto_results:
+        all_results['yahoo_crypto'] = yahoo_crypto_results
+        logger.info("Crypto Market backtest completed successfully")
+    else:
+        logger.error("Crypto Market backtest failed")
     
     print(f"\n{'=' * 60}")
     print("Waiting 2 seconds before starting Russian market backtest...")
@@ -146,7 +169,7 @@ def run_both_backtests(config_path: str = "config/config.yaml") -> dict:
     print("UNIFIED BACKTEST COMPLETED!")
     print(f"{'=' * 60}")
     print(f"Total Execution Time: {total_execution_time:.1f} seconds")
-    print(f"Successful Backtests: {len(all_results)}/2")
+    print(f"Successful Backtests: {len(all_results)}/3")
     
     if len(all_results) > 0:
         print(f"\nResults saved to:")
@@ -154,30 +177,35 @@ def run_both_backtests(config_path: str = "config/config.yaml") -> dict:
             print(f"  - reports/{market}/")
         
         # Comparative summary
-        if len(all_results) == 2:
+        if len(all_results) >= 2:
             print(f"\nComparative Summary:")
-            print(f"{'Metric':<20} {'US Market':<15} {'Russian Market':<15}")
-            print(f"{'-' * 50}")
+            print(f"{'Metric':<20} {'US Futures':<15} {'Crypto':<15} {'Russian':<15}")
+            print(f"{'-' * 65}")
             
-            us_annual = us_sharpe = us_drawdown = "N/A"
+            futures_annual = futures_sharpe = futures_drawdown = "N/A"
+            crypto_annual = crypto_sharpe = crypto_drawdown = "N/A"  
             ru_annual = ru_sharpe = ru_drawdown = "N/A"
             
             for market, results in all_results.items():
                 if results.get('analysis_results') and results['analysis_results'].get('metrics'):
                     metrics = results['analysis_results']['metrics']
                     
-                    if market == 'yahoo':
-                        us_annual = f"{metrics.get('annual_return', 0):.2%}"
-                        us_sharpe = f"{metrics.get('sharpe_ratio', 0):.2f}"
-                        us_drawdown = f"{metrics.get('max_drawdown', 0):.2%}"
-                    else:
+                    if market == 'yahoo_futures':
+                        futures_annual = f"{metrics.get('annual_return', 0):.2%}"
+                        futures_sharpe = f"{metrics.get('sharpe_ratio', 0):.2f}"
+                        futures_drawdown = f"{metrics.get('max_drawdown', 0):.2%}"
+                    elif market == 'yahoo_crypto':
+                        crypto_annual = f"{metrics.get('annual_return', 0):.2%}"
+                        crypto_sharpe = f"{metrics.get('sharpe_ratio', 0):.2f}"
+                        crypto_drawdown = f"{metrics.get('max_drawdown', 0):.2%}"
+                    else:  # moex
                         ru_annual = f"{metrics.get('annual_return', 0):.2%}"
                         ru_sharpe = f"{metrics.get('sharpe_ratio', 0):.2f}"
                         ru_drawdown = f"{metrics.get('max_drawdown', 0):.2%}"
             
-            print(f"{'Annual Return':<20} {us_annual:<15} {ru_annual:<15}")
-            print(f"{'Sharpe Ratio':<20} {us_sharpe:<15} {ru_sharpe:<15}")
-            print(f"{'Max Drawdown':<20} {us_drawdown:<15} {ru_drawdown:<15}")
+            print(f"{'Annual Return':<20} {futures_annual:<15} {crypto_annual:<15} {ru_annual:<15}")
+            print(f"{'Sharpe Ratio':<20} {futures_sharpe:<15} {crypto_sharpe:<15} {ru_sharpe:<15}")
+            print(f"{'Max Drawdown':<20} {futures_drawdown:<15} {crypto_drawdown:<15} {ru_drawdown:<15}")
     
     return all_results
 
@@ -189,16 +217,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_backtest.py                    # Run both Yahoo and MOEX backtests
-  python run_backtest.py --source yahoo     # Run only Yahoo backtest
-  python run_backtest.py --source moex      # Run only MOEX backtest
+  python run_backtest.py                               # Run all backtests
+  python run_backtest.py --source yahoo_futures       # Run only Yahoo Futures backtest
+  python run_backtest.py --source yahoo_crypto        # Run only Yahoo Crypto backtest
+  python run_backtest.py --source moex                # Run only MOEX backtest
         """
     )
     
     parser.add_argument(
         '--source', 
-        choices=['yahoo', 'moex'], 
-        help='Data source for backtest (yahoo or moex). If not specified, runs both.'
+        choices=['yahoo_futures', 'yahoo_crypto', 'moex'], 
+        help='Data source for backtest (yahoo_futures, yahoo_crypto or moex). If not specified, runs all.'
     )
     
     parser.add_argument(
@@ -219,7 +248,11 @@ Examples:
     try:
         if args.source:
             # Run single backtest
-            source_map = {'yahoo': 'Yahoo', 'moex': 'MOEX'}
+            source_map = {
+                'yahoo_futures': 'YahooFutures', 
+                'yahoo_crypto': 'YahooCrypto',
+                'moex': 'MOEX'
+            }
             data_source = source_map[args.source.lower()]
             
             print(f"Running {args.source.upper()} backtest only")
@@ -234,11 +267,11 @@ Examples:
                 print(f"\n{args.source.upper()} backtest failed!")
                 sys.exit(1)
         else:
-            # Run both backtests
-            print("No source specified - running both Yahoo and MOEX backtests")
+            # Run all backtests
+            print("No source specified - running all backtests (YahooFutures, YahooCrypto, MOEX)")
             print("=" * 60)
             
-            all_results = run_both_backtests(args.config)
+            all_results = run_all_backtests(args.config)
             
             if len(all_results) == 0:
                 logger.error("All backtests failed!")

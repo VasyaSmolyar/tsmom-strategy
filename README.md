@@ -7,9 +7,10 @@ This project implements and backtests a **Time Series Momentum (TSMOM)** strateg
 
 ### 🎯 Strategy Performance Highlights
 - **Russian Market (MOEX)**: 33.75% annual return, 1.55 Sharpe ratio, -27.50% max drawdown
-- **US Market (Yahoo)**: 34.51% annual return, 1.72 Sharpe ratio, -41.34% max drawdown
+- **US Futures Market (Yahoo Futures)**: 34.51% annual return, 1.72 Sharpe ratio, -41.34% max drawdown  
+- **Crypto Market (Yahoo Crypto)**: High volatility with significant growth potential since 2018
 - **Risk Management**: Target 40% volatility with inverse volatility position sizing
-- **Diversification**: 20+ assets across multiple asset classes and geographies
+- **Diversification**: 30+ assets across multiple asset classes and geographies
 
 ## 🚀 Quick Start
 
@@ -29,17 +30,18 @@ pip install -r requirements.txt
 
 ### Run Backtest
 ```bash
-# Quick start - Run both markets (US + Russian)
+# Quick start - Run all markets (US Futures + Crypto + Russian)
 python run_backtest.py
 
 # Run specific market only
-python run_backtest.py --source yahoo    # US Market (S&P500 benchmark)
-python run_backtest.py --source moex     # Russian Market (IMOEX benchmark)
+python run_backtest.py --source yahoo_futures    # US Futures Market (S&P500 benchmark)
+python run_backtest.py --source yahoo_crypto     # Crypto Market (BTC benchmark)
+python run_backtest.py --source moex             # Russian Market (IMOEX benchmark)
 
 # Advanced usage with main module
-python src/main.py --data-source Yahoo   # or MOEX
-python src/main.py --sensitivity         # Sensitivity analysis
-python src/main.py --no-download         # Use existing data
+python src/main.py --data-source YahooFutures    # or YahooCrypto, MOEX
+python src/main.py --sensitivity                 # Sensitivity analysis
+python src/main.py --no-download                 # Use existing data
 ```
 
 ## 📊 Strategy Details
@@ -468,7 +470,7 @@ flake8 src/ tests/
 - **Risk Warning**: Use at your own risk for any actual trading decisions
 
 ### 📊 Data & Methodology Notes
-- **Data Sources**: Yahoo Finance (global) + MOEX CSV files (Russian markets)
+- **Data Sources**: Yahoo Finance Futures (global), Yahoo Finance Crypto (since 2018) + MOEX CSV files (Russian markets)
 - **Backtesting Limitations**: Does not account for all real-world trading constraints
 - **Market Impact**: Assumes infinite liquidity and no market impact
 - **Transaction Costs**: Simplified transaction cost model (0.1% per trade)
