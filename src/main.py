@@ -116,7 +116,7 @@ def run_full_backtest(config_path: str = "config/config.yaml",
         logger.info("Step 3: Generating performance analysis...")
         # Determine data source suffix for subdirectory
         data_source_suffix = data_source.lower() if data_source else ""
-        analyzer = PerformanceAnalyzer(data_source_suffix=data_source_suffix)
+        analyzer = PerformanceAnalyzer(data_source_suffix=data_source)
         
         # Get benchmark data aligned with strategy start
         # Determine benchmark symbol based on data source

@@ -35,14 +35,37 @@ class PerformanceAnalyzer:
         self.reports_dir = Path(reports_dir)
         self.reports_dir.mkdir(exist_ok=True)
         
+        # Store original data source for benchmark labeling
+        self.data_source_suffix = data_source_suffix
+        
         # Add data source suffix if provided
         if data_source_suffix:
+            # Use lowercase for directory names but keep original for benchmark labels
             self.reports_dir = self.reports_dir / data_source_suffix.lower()
             self.reports_dir.mkdir(exist_ok=True)
         
         # Create subdirectories
         (self.reports_dir / "plots").mkdir(exist_ok=True)
         (self.reports_dir / "tables").mkdir(exist_ok=True)
+    
+    def get_benchmark_label(self, data_source: str = "") -> str:
+        """Get appropriate benchmark label based on data source.
+        
+        Args:
+            data_source: Data source identifier
+            
+        Returns:
+            Appropriate benchmark label string
+        """
+        # Use the stored data_source_suffix if data_source parameter is not provided properly
+        effective_data_source = data_source if data_source and data_source != "Yahoo" else self.data_source_suffix
+        
+        if effective_data_source.upper() == 'MOEX':
+            return 'Benchmark (IMOEX)'
+        elif effective_data_source.lower() in ['yahoocrypto', 'yahoo_crypto']:
+            return 'Benchmark (Bitcoin)'
+        else:
+            return 'Benchmark (S&P 500)'
     
     def calculate_comprehensive_metrics(self, strategy_returns: pd.Series,
                                      benchmark_returns: Optional[pd.Series] = None) -> Dict:
@@ -185,7 +208,7 @@ class PerformanceAnalyzer:
         if benchmark_returns is not None:
             benchmark_cumulative = (1 + benchmark_returns.dropna()).cumprod()
             # Use appropriate benchmark label based on data source
-            benchmark_label = 'Benchmark (IMOEX)' if data_source == 'MOEX' else 'Benchmark (S&P 500)'
+            benchmark_label = self.get_benchmark_label(data_source)
             plt.plot(benchmark_cumulative.index, benchmark_cumulative.values, 
                     label=benchmark_label, linewidth=2, alpha=0.7)
         
@@ -530,7 +553,7 @@ class PerformanceAnalyzer:
         metrics_table = self.create_performance_table(metrics)
         
         # Generate markdown report
-        self.generate_markdown_report(metrics, strategy_returns, benchmark_returns)
+        self.generate_markdown_report(metrics, strategy_returns, benchmark_returns, data_source)
         
         logger.info("Comprehensive report generated successfully")
         
@@ -543,7 +566,8 @@ class PerformanceAnalyzer:
     
     def generate_markdown_report(self, metrics: Dict,
                                strategy_returns: pd.Series,
-                               benchmark_returns: Optional[pd.Series] = None) -> None:
+                               benchmark_returns: Optional[pd.Series] = None,
+                               data_source: str = "Yahoo") -> None:
         """Generate markdown report."""
         report_path = self.reports_dir / "performance_report.md"
         
@@ -582,7 +606,8 @@ class PerformanceAnalyzer:
             f.write(f"- **Kurtosis**: {metrics.get('kurtosis', 0):.4f}\n\n")
             
             if benchmark_returns is not None:
-                f.write("## Benchmark Comparison\n\n")
+                benchmark_name = self.get_benchmark_label(data_source).replace("Benchmark (", "").replace(")", "")
+                f.write(f"## Benchmark Comparison ({benchmark_name})\n\n")
                 f.write(f"- **Excess Return**: {metrics.get('excess_return', 0):.2%}\n")
                 f.write(f"- **Information Ratio**: {metrics.get('information_ratio', 0):.2f}\n")
                 f.write(f"- **Beta**: {metrics.get('beta', 0):.4f}\n")
